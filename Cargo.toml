@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "wordle_perf",
+    "wordle_strategies"
+]

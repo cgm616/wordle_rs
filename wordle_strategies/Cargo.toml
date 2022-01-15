@@ -1,0 +1,8 @@
+[package]
+name = "wordle_strategies"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+regex = "1.5.4"
+wordle_perf = { path = "../wordle_perf" }
