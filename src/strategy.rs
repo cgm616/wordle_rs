@@ -2,29 +2,27 @@ use std::{fmt::Display, ops::Deref};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{words::GUESSES, WError};
+use crate::{words::GUESSES, WordleError};
 
-pub mod util;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Hash)]
 pub struct Word {
     index: usize,
 }
 
 impl Word {
-    pub fn new(index: usize) -> Result<Self, WError> {
+    pub fn new(index: usize) -> Result<Self, WordleError> {
         if index < GUESSES.len() {
             Ok(Word { index })
         } else {
-            Err(WError::InvalidIndex)
+            Err(WordleError::InvalidIndex(index))
         }
     }
 
-    pub fn from_str(word: &str) -> Result<Self, WError> {
+    pub fn from_str(word: &str) -> Result<Self, WordleError> {
         GUESSES
             .binary_search(&word)
             .map(|index| Word { index })
-            .map_err(|_| WError::NotInWordlist)
+            .map_err(|_| WordleError::NotInWordlist(word.to_string()))
     }
 }
 
@@ -42,7 +40,7 @@ impl Display for Word {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Copy)]
 pub struct Puzzle {
     word: Word,
 }
@@ -81,14 +79,14 @@ impl Puzzle {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub enum Grade {
     Correct,
     Almost,
     Incorrect,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Attempts {
     inner: Vec<Word>,
 }
