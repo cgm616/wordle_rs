@@ -1,7 +1,26 @@
 [workspace]
-
 members = [
-    "wordle_perf",
     "wordle_strategies",
     "wordle_runner"
 ]
+
+[package]
+name = "wordle_rs"
+version = "0.1.0"
+edition = "2021"
+authors = ["cgm616 <cargo@cgm616.me>"]
+rust-version = "1.57"
+description = "Tools to build and test Wordle strategies"
+repository = "https://github.com/cgm616/wordle_rs/"
+license = "MIT"
+keywords = ["wordle", "word", "game", "testing", "strategy"]
+categories = ["simulation"]
+
+[dependencies]
+comfy-table = "5.0"
+indicatif = {version = "0.16", features = ["rayon"]}
+itertools = "0.10.3"
+rand = "0.8"
+rayon = "1.5.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

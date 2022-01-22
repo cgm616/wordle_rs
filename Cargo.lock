@@ -604,8 +604,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
-name = "wordle_perf"
-version = "0.1.0-dev"
+name = "wordle_rs"
+version = "0.1.0"
 dependencies = [
  "comfy-table",
  "indicatif",
@@ -618,18 +618,18 @@ dependencies = [
 
 [[package]]
 name = "wordle_runner"
-version = "0.1.0-dev"
+version = "0.1.0"
 dependencies = [
- "wordle_perf",
+ "wordle_rs",
  "wordle_strategies",
 ]
 
 [[package]]
 name = "wordle_strategies"
-version = "0.1.0-dev"
+version = "0.1.0"
 dependencies = [
  "itertools",
  "lazy_static",
  "regex",
- "wordle_perf",
+ "wordle_rs",
 ]

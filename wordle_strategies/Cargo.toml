@@ -1,10 +1,11 @@
 [package]
 name = "wordle_strategies"
-version = "0.1.0-dev"
+version = "0.1.0"
 edition = "2021"
+license = "../LICENSE.md"
 
 [dependencies]
 itertools = "0.10"
 lazy_static = "1.4"
 regex = "1.5"
-wordle_perf = { path = "../wordle_perf", version = "0.1.0-dev" }
+wordle_rs = { version = "0.1", path = "../" }

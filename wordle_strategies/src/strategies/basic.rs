@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Display};
 
-use wordle_perf::{
+use wordle_rs::{
     strategy::{Attempts, Grade, Puzzle, Strategy, Word},
     words::GUESSES,
 };
