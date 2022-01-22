@@ -8,9 +8,9 @@
 
 Have you ever gotten so obsessed with [Wordle](https://www.powerlanguage.co.uk/wordle/) that you wanted to evaluate different strategies programmatically? If so, you're in the right place.
 
-`wordle_rs` has three parts:
+This crate is a part of the `wordle_rs` project, which has three parts:
 - `wordle_rs`, a library with tools you can use to write and evaluate your own Wordle strategies,
-- `wordle_strategies`, a library demonstrating few strategies that I wrote, and
+- `wordle_strategies`, a library demonstrating a few strategies that I wrote, and
 - `wordle_runner`, a binary that can run and compare Wordle strategies written with `wordle_rs`.
 
 Please feel free to contribute your own strategies to `wordle_strategies`!
