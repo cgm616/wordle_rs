@@ -1,4 +1,4 @@
-use wordle_perf::Strategy;
+use wordle_rs::Strategy;
 
 /// A hard- or easymode Wordle strategy that guesses the word that most narrows
 /// the remaining search space.

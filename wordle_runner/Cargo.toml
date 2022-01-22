@@ -1,0 +1,17 @@
+[package]
+name = "wordle_runner"
+version = "0.1.0"
+edition = "2021"
+authors = ["cgm616 <cargo@cgm616.me>"]
+rust-version = "1.57"
+description = "A command-line tool for running Wordle strategies"
+repository = "https://github.com/cgm616/wordle_rs/"
+license = "MIT"
+keywords = ["wordle", "word", "game", "testing", "strategy"]
+categories = ["simulation"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+wordle_strategies = {version = "0.1", path = "../wordle_strategies"}
+wordle_rs = {version = "0.1", path = "../"}

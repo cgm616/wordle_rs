@@ -1,6 +1,6 @@
 use regex::bytes::{Regex, RegexBuilder};
 use std::collections::{BTreeMap, HashMap};
-use wordle_perf::strategy::{Grade, Word};
+use wordle_rs::strategy::{Grade, Word};
 
 pub fn generate_regex<'a>(
     correct: &[(usize, char)],

@@ -1,10 +1,10 @@
 use std::fmt::Display;
 
-use wordle_perf::strategy::{Attempts, Puzzle, Strategy, Word};
+use wordle_rs::strategy::{Attempts, Puzzle, Strategy, Word};
 
 /// A Wordle strategy that only ever guesses the first few words in the wordlist.
-/// 
-/// This exists to show how [wordle_perf::Strategy] is implemented.
+///
+/// This exists to show how [wordle_rs::Strategy] is implemented.
 pub struct Stupid;
 
 impl Strategy for Stupid {

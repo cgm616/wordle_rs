@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use wordle_perf::{strategy::Attempts, Strategy};
+use wordle_rs::{strategy::Attempts, Strategy};
 
 use crate::util::{occurrences, Information};
 
@@ -11,10 +11,10 @@ use crate::util::{occurrences, Information};
 pub struct CommonEasy;
 
 impl Strategy for CommonEasy {
-    fn solve(&self, puzzle: &wordle_perf::strategy::Puzzle) -> Attempts {
+    fn solve(&self, puzzle: &wordle_rs::strategy::Puzzle) -> Attempts {
         lazy_static! {
             static ref SORTED: Vec<&'static str> = {
-                let mut words = Vec::from(wordle_perf::words::GUESSES);
+                let mut words = Vec::from(wordle_rs::words::GUESSES);
                 words.sort_unstable_by_key(|s: &&str| {
                     -s.chars()
                         .unique()

@@ -1,4 +1,4 @@
-use wordle_perf::{harness::Harness, strategy::Word};
+use wordle_rs::{harness::Harness, strategy::Word};
 use wordle_strategies::{Basic, Common};
 
 fn main() {
