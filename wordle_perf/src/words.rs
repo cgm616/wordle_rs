@@ -1,6 +1,6 @@
 /// Indicies into [GUESSES] of all possible correct answers to a Wordle puzzle.
 ///
-/// Wordle allows you to guess many words, but it will only selected some
+/// Wordle allows you to guess many words, but it will only select some
 /// words as answers. This slice holds the indices of those words in [GUESSES].
 pub const ANSWERS: [usize; 2315] = [
     2009, 8991, 10069, 5232, 678, 1224, 3940, 3503, 7366, 9818, 4942, 3236, 7025, 5704, 10731,
@@ -162,12 +162,12 @@ pub const ANSWERS: [usize; 2315] = [
 ///
 /// Wordle prevents you from guessing five-letter sequences that are not words,
 /// and this is the wordlist that it uses to determine which guesses are valid.
-/// Reading this list is not a spoiler, unlike [ANSWERS], since this is just a
-/// list of all words that it will accept.
+/// Reading this list is not a spoiler since this is just a
+/// list of all words that Wordle will accept.
 ///
-/// > In the Wordle source code, this list is disjoint from [ANSWERS]. I
-/// > have duplicated the elements of [ANSWERS] here to make guessing easier.
-/// > The elements of [ANSWERS] are mixed in and this array is sorted.
+/// In the Wordle source code, this list is disjoint from [ANSWERS]. I
+/// have duplicated the elements of [ANSWERS] here to make guessing easier.
+/// The elements of [ANSWERS] are mixed in and this array is sorted.
 pub const GUESSES: [&str; 12972] = [
     "aahed", "aalii", "aargh", "aarti", "abaca", "abaci", "aback", "abacs", "abaft", "abaka",
     "abamp", "aband", "abase", "abash", "abask", "abate", "abaya", "abbas", "abbed", "abbes",

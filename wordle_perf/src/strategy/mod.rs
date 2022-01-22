@@ -1,30 +1,30 @@
 use std::{fmt::Display, ops::Deref};
 
+use serde::{Deserialize, Serialize};
+
 use crate::{words::GUESSES, WError};
 
 pub mod util;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Word {
-    Wordlist(usize),
-    Other(String),
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct Word {
+    index: usize,
 }
 
 impl Word {
-    pub fn from_wordlist(index: usize) -> Result<Self, WError> {
-        if index < crate::words::GUESSES.len() {
-            Ok(Self::Wordlist(index))
+    pub fn new(index: usize) -> Result<Self, WError> {
+        if index < GUESSES.len() {
+            Ok(Word { index })
         } else {
-            Err(WError::NotInWordlist)
+            Err(WError::InvalidIndex)
         }
     }
 
-    pub fn from_other_word(word: &str) -> Result<Self, WError> {
-        if word.chars().all(|c| c.is_ascii_alphanumeric()) {
-            Ok(Self::Other(word.to_ascii_lowercase()))
-        } else {
-            Err(WError::InvalidWord)
-        }
+    pub fn from_str(word: &str) -> Result<Self, WError> {
+        GUESSES
+            .binary_search(&word)
+            .map(|index| Word { index })
+            .map_err(|_| WError::NotInWordlist)
     }
 }
 
@@ -32,10 +32,7 @@ impl Deref for Word {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Wordlist(i) => crate::words::GUESSES[*i],
-            Self::Other(s) => s.as_str(),
-        }
+        crate::words::GUESSES[self.index]
     }
 }
 
@@ -48,28 +45,26 @@ impl Display for Word {
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Puzzle {
     word: Word,
-    hardmode: bool,
 }
 
 impl Puzzle {
-    pub fn new(word: Word, hardmode: bool) -> Self {
-        Puzzle { word, hardmode }
+    pub fn new(word: Word) -> Self {
+        Puzzle { word }
     }
 
-    pub fn check(&self, other: &Word, attempts: &mut Attempts) -> Result<([Grade; 5], bool), ()> {
-        if let Word::Other(s) = other {
-            if !GUESSES.iter().any(|&t| t == s) {
-                return Err(());
-            }
-        }
-
-        if let Err(_) = attempts.push(other.clone()) {
+    pub fn check(
+        &self,
+        guess: &Word,
+        attempts: &mut Attempts,
+        hardmode: bool,
+    ) -> Result<([Grade; 5], bool), ()> {
+        if let Err(_) = attempts.push(*guess) {
             return Err(());
         }
 
         let mut res = [Grade::Incorrect; 5];
         let mut correct = true;
-        for (i, (guess, answer)) in other.chars().zip(self.word.chars()).enumerate() {
+        for (i, (guess, answer)) in guess.chars().zip(self.word.chars()).enumerate() {
             if guess == answer {
                 res[i] = Grade::Correct;
             } else if self.word.contains(guess) {
@@ -84,10 +79,6 @@ impl Puzzle {
 
         Ok((res, correct))
     }
-
-    pub(crate) fn destroy(self) -> Word {
-        self.word
-    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -97,7 +88,7 @@ pub enum Grade {
     Incorrect,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Attempts {
     inner: Vec<Word>,
 }
@@ -134,14 +125,18 @@ impl Attempts {
 
 impl Display for Attempts {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for word in self.inner() {
-            writeln!(f, "{}", word)?;
+        if let Some((last, rest)) = self.inner.split_last() {
+            for word in rest {
+                writeln!(f, "{}", word)?;
+            }
+            write!(f, "{}", last)?;
         }
-
         Ok(())
     }
 }
 
-pub trait Strategy: Display {
+pub trait Strategy: Display + Sync {
     fn solve(&self, puzzle: &Puzzle) -> Attempts;
+    fn version(&self) -> &'static str;
+    fn hardmode(&self) -> bool;
 }

@@ -1,6 +1,15 @@
-use std::fmt::Display;
+use std::{
+    borrow::Borrow,
+    fmt::Display,
+    sync::{Arc, Mutex},
+};
 
+use comfy_table::{Cell, Color, ColumnConstraint, Row, Table, Width};
+use indicatif::{ParallelProgressIterator, ProgressIterator};
+use itertools::Itertools;
 use rand::seq::index::sample;
+use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     strategy::{Attempts, Puzzle, Strategy, Word},
@@ -69,35 +78,44 @@ impl Harness {
     }
 
     pub fn run(&self) -> Vec<Perf> {
-        let mut perfs = Vec::new();
-        for strat in &self.strategies {
-            perfs.push(Perf::new(strat.as_ref()))
+        let perfs = Arc::new(Mutex::new(Vec::new()));
+        {
+            let mut perfs = perfs.lock().unwrap();
+            for strat in &self.strategies {
+                perfs.push(Perf::new(strat.as_ref()))
+            }
         }
+
         let mut rng = rand::thread_rng();
 
         if let Some(n) = self.num_guesses {
             // try only some random words
-            for i in sample(&mut rng, ANSWERS.len(), n) {
-                self.run_inner(ANSWERS[i], &mut perfs);
-            }
+            sample(&mut rng, ANSWERS.len(), n)
+                .iter()
+                .par_bridge()
+                .progress_count(n as u64)
+                .for_each(|i| self.run_inner(ANSWERS[i], perfs.clone()))
         } else {
-            for i in 0..ANSWERS.len() {
-                self.run_inner(ANSWERS[i], &mut perfs);
-            }
+            (0..ANSWERS.len())
+                .into_par_iter()
+                .progress()
+                .for_each(|i| self.run_inner(ANSWERS[i], perfs.clone()))
         }
 
-        perfs
+        Arc::try_unwrap(perfs).unwrap().into_inner().unwrap()
     }
 
-    fn run_inner(&self, index: usize, perfs: &mut [Perf]) {
-        let word = Word::from_wordlist(index).unwrap();
-        let puzzle = Puzzle::new(word.clone(), false);
+    fn run_inner(&self, index: usize, perfs: Arc<Mutex<Vec<Perf>>>) {
+        let word = Word::new(index).unwrap();
+        let puzzle = Puzzle::new(word.clone());
 
         for (i, strategy) in self.strategies.iter().enumerate() {
-            perfs[i].tries.push((word.clone(), strategy.solve(&puzzle)));
+            let solution = strategy.solve(&puzzle);
+            {
+                let mut perfs = perfs.lock().unwrap();
+                perfs[i].tries.push((word.clone(), solution));
+            }
         }
-
-        // let word = puzzle.destroy();
     }
 
     pub fn run_and_summarize(&self) -> Vec<Perf> {
@@ -110,7 +128,7 @@ impl Harness {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Perf {
     tries: Vec<(Word, Attempts)>,
     strategy_name: String,
@@ -120,7 +138,7 @@ impl Perf {
     pub(crate) fn new(strat: &dyn Strategy) -> Self {
         Perf {
             tries: Vec::new(),
-            strategy_name: format!("{}", strat),
+            strategy_name: format!("{} v{}", strat, strat.version()),
         }
     }
 
@@ -165,6 +183,37 @@ impl Perf {
 
     pub fn summarize(&self) {
         print!("{}", self)
+    }
+
+    // pub fn compare(&self, other: &Perf) {
+    //     todo!()
+    // }
+
+    pub fn print(&self) {
+        self.summarize();
+        let mut table = Table::new();
+        if !table.is_tty() {
+            table.set_table_width(80);
+        } else {
+            table.load_preset(comfy_table::presets::UTF8_FULL);
+        }
+        let columns = (table.get_table_width().unwrap() / 9) as usize;
+        for chunk in self.tries.chunks(columns) {
+            let mut row = Row::new();
+            for (word, attempts) in chunk {
+                let mut cell = Cell::new(format!("{}\n-----\n{}", word, attempts));
+                if !attempts.solved(word) {
+                    cell = cell.bg(Color::Red).fg(Color::Black);
+                }
+                row.add_cell(cell);
+            }
+            table.add_row(row);
+        }
+        table.set_constraints(vec![
+            ColumnConstraint::LowerBoundary(Width::Fixed(5));
+            columns
+        ]);
+        println!("{}", table);
     }
 }
 

@@ -3,6 +3,8 @@ use std::fmt::Display;
 use wordle_perf::strategy::{Attempts, Puzzle, Strategy, Word};
 
 /// A Wordle strategy that only ever guesses the first few words in the wordlist.
+/// 
+/// This exists to show how [wordle_perf::Strategy] is implemented.
 pub struct Stupid;
 
 impl Strategy for Stupid {
@@ -10,14 +12,22 @@ impl Strategy for Stupid {
         let mut attempts = Attempts::new();
 
         for i in 0..6 {
-            let word = Word::from_wordlist(i).unwrap();
-            let (_, correct) = puzzle.check(&word, &mut attempts).unwrap();
+            let word = Word::new(i).unwrap();
+            let (_, correct) = puzzle.check(&word, &mut attempts, false).unwrap();
             if correct {
                 break;
             }
         }
 
         attempts
+    }
+
+    fn version(&self) -> &'static str {
+        "0.10"
+    }
+
+    fn hardmode(&self) -> bool {
+        false
     }
 }
 
