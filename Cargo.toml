@@ -2,5 +2,6 @@
 
 members = [
     "wordle_perf",
-    "wordle_strategies"
+    "wordle_strategies",
+    "wordle_runner"
 ]

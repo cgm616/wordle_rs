@@ -617,6 +617,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "wordle_runner"
+version = "0.1.0"
+dependencies = [
+ "wordle_perf",
+ "wordle_strategies",
+]
+
+[[package]]
 name = "wordle_strategies"
 version = "0.1.0"
 dependencies = [
