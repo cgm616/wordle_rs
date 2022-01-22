@@ -15,6 +15,7 @@ repository = "https://github.com/cgm616/wordle_rs/"
 license = "MIT"
 keywords = ["wordle", "word", "game", "testing", "strategy"]
 categories = ["simulation"]
+readme = "README.md"
 
 [dependencies]
 comfy-table = "5.0"

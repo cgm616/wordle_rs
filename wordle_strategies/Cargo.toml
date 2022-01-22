@@ -9,6 +9,7 @@ repository = "https://github.com/cgm616/wordle_rs/"
 license = "MIT"
 keywords = ["wordle", "word", "game", "testing", "strategy"]
 categories = ["simulation"]
+readme = "../README.md"
 
 [dependencies]
 itertools = "0.10"
