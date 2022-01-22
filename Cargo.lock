@@ -605,7 +605,7 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "wordle_perf"
-version = "0.1.0"
+version = "0.1.0-dev"
 dependencies = [
  "comfy-table",
  "indicatif",
@@ -618,7 +618,7 @@ dependencies = [
 
 [[package]]
 name = "wordle_runner"
-version = "0.1.0"
+version = "0.1.0-dev"
 dependencies = [
  "wordle_perf",
  "wordle_strategies",
@@ -626,7 +626,7 @@ dependencies = [
 
 [[package]]
 name = "wordle_strategies"
-version = "0.1.0"
+version = "0.1.0-dev"
 dependencies = [
  "itertools",
  "lazy_static",
