@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{words::GUESSES, WordleError};
 
+pub mod stupid;
+
 /// A Wordle word.
 ///
 /// This struct represents a possible Wordle guess, and its construction
@@ -92,16 +94,14 @@ impl Display for Word {
 ///
 /// # Examples
 ///
-/// Here, we create a new puzzle and solve it with a strategy from
-/// [`wordle_strategies`]().
+/// Here, we create a new puzzle and solve it with a bad strategy.
 ///
 /// ```rust
-/// # use wordle_strategies::Basic;
 /// # use wordle_rs::strategy::Word;
-/// use wordle_rs::{strategy::Puzzle, Strategy};
+/// use wordle_rs::{strategy::{stupid::Stupid, Puzzle}, Strategy};
 ///
 /// let puzzle = Puzzle::new(Word::from_str("earth")?);
-/// let strategy = Basic::new();
+/// let strategy = Stupid;
 /// let attempts = strategy.solve(&puzzle);
 /// #
 /// # Ok::<_, wordle_rs::WordleError>(())

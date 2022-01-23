@@ -1,9 +1,6 @@
 mod basic;
 pub use basic::Basic;
 
-mod stupid;
-pub use stupid::Stupid;
-
 mod common;
 pub use common::Common;
 
