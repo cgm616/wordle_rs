@@ -2,18 +2,14 @@
 
 use thiserror::Error;
 
-/// Tools for defining Wordle strategies.
 pub mod strategy;
 pub use strategy::Strategy;
 
-/// The wordlists used by Wordle.
 pub mod words;
 
-/// The test harness for running Wordle strategies.
 pub mod harness;
 pub use harness::Harness;
 
-/// Evaluating and comparing strategies.
 pub mod perf;
 pub use perf::{Perf, PerfSummary};
 

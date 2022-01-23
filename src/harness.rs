@@ -1,3 +1,5 @@
+//! The test harness for running Wordle strategies.
+
 use std::sync::{Arc, Mutex};
 
 use indicatif::ParallelProgressIterator;
@@ -10,6 +12,27 @@ use crate::{
     words::ANSWERS,
 };
 
+/// A test harness that can run many strategies on many puzzles.
+///
+/// When you want to test your strategies, create a new test harness
+/// with [`new()`](Harness::new()). You can then configure it using various
+/// methods. Note that these configuration methods consume the existing
+/// [`Harness`] and return a new one.
+///
+/// # Examples
+///
+/// ```rust
+/// # use wordle_rs::harness::Harness;
+/// use wordle_strategies::Basic;
+///
+/// let harness = Harness::new()
+///     .quiet()
+///     .add_strategy(Box::new(Basic::new()))
+///     .test_num(50);
+///
+/// let results = harness.run();
+/// ```
+#[derive(Debug)]
 pub struct Harness {
     strategies: Vec<Box<dyn Strategy>>,
     verbose: bool,
@@ -27,10 +50,19 @@ impl Default for Harness {
 }
 
 impl Harness {
+    /// Creates a new test harness with default configuration.
+    ///
+    /// Defaults:
+    /// 1. tests no strategies
+    /// 2. quiet mode
+    /// 3. runs each strategy on 100 puzzles chosen at random
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Makes the harness verbose while testing.
+    ///
+    /// As of right now, this consists of a progress bar and nothing else.
     pub fn verbose(self) -> Self {
         Harness {
             verbose: true,
@@ -38,6 +70,7 @@ impl Harness {
         }
     }
 
+    /// Makes the harness silent while testing.
     pub fn quiet(self) -> Self {
         Harness {
             verbose: false,
@@ -45,18 +78,21 @@ impl Harness {
         }
     }
 
+    /// Adds a strategy to the harness for testing.
     pub fn add_strategy(self, strat: Box<dyn Strategy>) -> Self {
         let mut strategies = self.strategies;
         strategies.push(strat);
         Harness { strategies, ..self }
     }
 
+    /// Adds a [`Vec`] of strategies to the harness for testing.
     pub fn add_strategies(self, strats: Vec<Box<dyn Strategy>>) -> Self {
         let mut strategies = self.strategies;
         strategies.extend(strats);
         Harness { strategies, ..self }
     }
 
+    /// Sets the harness to test each strategy on each possible Wordle answer.
     pub fn test_all(self) -> Self {
         Harness {
             num_guesses: None,
@@ -64,6 +100,7 @@ impl Harness {
         }
     }
 
+    /// Sets the harness to test each strategy on `n` random Wordle answers.
     pub fn test_num(self, n: usize) -> Self {
         Harness {
             num_guesses: Some(n.clamp(0, ANSWERS.len())),
@@ -71,6 +108,10 @@ impl Harness {
         }
     }
 
+    /// Runs the harness and produces performances for each strategy.
+    ///
+    /// The [`Perf`]s will be in the same order as the strategies were added
+    /// to the harness.
     pub fn run(&self) -> Vec<Perf> {
         let perfs = Arc::new(Mutex::new(Vec::new()));
         {
@@ -126,6 +167,8 @@ impl Harness {
         }
     }
 
+    /// Runs the harness (see [`run()`](Harness::run())) and prints performance
+    /// summaries of each strategy.
     pub fn run_and_summarize(&self) -> Vec<Perf> {
         let perfs = self.run();
         for perf in &perfs {

@@ -14,7 +14,7 @@ use crate::util::{generate_regex, occurrences, Information};
 /// Each round, it will guess the next word that could be the answer (given
 /// what it knows) containing the most common letters. It is essentially the
 /// same as [Basic](crate::Basic) but a little smarter.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Common;
 
 impl Strategy for Common {
