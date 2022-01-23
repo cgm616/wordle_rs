@@ -1,10 +1,14 @@
+//! A single bad strategy to show how they are written.
+
 use std::fmt::Display;
 
-use wordle_rs::strategy::{Attempts, Puzzle, Strategy, Word};
+use crate::strategy::{Attempts, Puzzle, Strategy, Word};
 
 /// A Wordle strategy that only ever guesses the first few words in the wordlist.
 ///
-/// This exists to show how [wordle_rs::Strategy] is implemented.
+/// This exists to show how [`Strategy`](super::Strategy) is implemented. It
+/// is not recommended to run your own strategies against it.
+/// For that, check out the [`wordle_strategies`]() crate.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Stupid;
 

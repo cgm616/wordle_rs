@@ -23,11 +23,11 @@ use crate::{
 ///
 /// ```rust
 /// # use wordle_rs::harness::Harness;
-/// use wordle_strategies::Basic;
+/// use wordle_rs::strategy::stupid::Stupid;
 ///
 /// let harness = Harness::new()
 ///     .quiet()
-///     .add_strategy(Box::new(Basic::new()))
+///     .add_strategy(Box::new(Stupid))
 ///     .test_num(50);
 ///
 /// let results = harness.run();

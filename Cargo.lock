@@ -635,7 +635,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
- "wordle_strategies",
 ]
 
 [[package]]
