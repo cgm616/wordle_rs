@@ -139,6 +139,8 @@ impl Harness {
                     .for_each(|i| self.run_inner(ANSWERS[i], perfs.clone()))
             }
         } else {
+            // try all words
+
             if self.verbose {
                 (0..ANSWERS.len())
                     .into_par_iter()
@@ -156,13 +158,13 @@ impl Harness {
 
     fn run_inner(&self, index: usize, perfs: Arc<Mutex<Vec<Perf>>>) {
         let word = Word::from_index(index).unwrap();
-        let puzzle = Puzzle::new(word.clone());
+        let puzzle = Puzzle::new(word);
 
         for (i, strategy) in self.strategies.iter().enumerate() {
             let solution = strategy.solve(&puzzle);
             {
                 let mut perfs = perfs.lock().unwrap();
-                perfs[i].tries.push((word.clone(), solution));
+                perfs[i].tries.push((word, solution));
             }
         }
     }

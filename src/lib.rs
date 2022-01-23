@@ -25,4 +25,8 @@ pub enum WordleError {
     /// Wordle word.
     #[error("the string \"{0}\" is not in the Wordle wordlist")]
     NotInWordlist(String),
+
+    /// The puzzle has already evaluated six guesses.
+    #[error("the puzzle has already evaluated six guesses")]
+    OutOfGuesses,
 }

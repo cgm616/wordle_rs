@@ -13,7 +13,7 @@ fn main() {
         ))
         // .test_num(2000);
         .test_all();
-    let perfs = harness.run_and_summarize();
+    let _perfs = harness.run_and_summarize();
 
     // for perf in perfs {
     //     perf.print();

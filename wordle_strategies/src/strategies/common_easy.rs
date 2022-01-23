@@ -4,7 +4,7 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use wordle_rs::{strategy::Attempts, Strategy};
 
-use crate::util::{occurrences, Information};
+use crate::util::occurrences;
 
 /// An easymode Wordle strategy that works the same way as
 /// [Common](crate::Common) but makes calculated easymode guesses.
@@ -26,14 +26,11 @@ impl Strategy for CommonEasy {
             };
         }
 
-        let mut attempts = Attempts::new();
-        let mut info = Information::new();
+        //let mut attempts = Attempts::new();
+        //let mut info = Information::new();
 
-        for i in 0..6 {
-            todo!()
-        }
-
-        attempts
+        // attempts
+        todo!("{:?}", puzzle)
     }
 
     fn version(&self) -> &'static str {
