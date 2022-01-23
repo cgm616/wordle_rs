@@ -13,6 +13,7 @@ use crate::util::{generate_regex, Information};
 /// The `Basic` strategy simply looks through the wordlist until it finds
 /// a word that could be the correct answer. It then guesses that word,
 /// learns new information about the answer, and searches again.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Basic {
     first_word: Option<Word>,
 }
@@ -53,7 +54,7 @@ impl Strategy for Basic {
                 self.first_word.clone().unwrap()
             } else {
                 let regex = info.hardmode_regex();
-                Word::new(
+                Word::from_index(
                     GUESSES
                         .iter()
                         .enumerate()

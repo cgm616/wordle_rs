@@ -26,7 +26,7 @@ wordle_rs = "0.1"
 
 Then, define a new struct and implement the `Strategy` trait for it.
 
-```rust
+```rust,ignore
 use wordle_rs::Strategy;
 
 struct MyCoolStrategy;
@@ -38,7 +38,7 @@ impl Strategy for MyCoolStrategy {
 
 Finally, configure and run the test harness on your strategy.
 
-```rust
+```rust,ignore
 use wordle_rs::{harness::Harness};
 
 fn main() {

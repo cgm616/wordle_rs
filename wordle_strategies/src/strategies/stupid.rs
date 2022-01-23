@@ -5,6 +5,7 @@ use wordle_rs::strategy::{Attempts, Puzzle, Strategy, Word};
 /// A Wordle strategy that only ever guesses the first few words in the wordlist.
 ///
 /// This exists to show how [wordle_rs::Strategy] is implemented.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Stupid;
 
 impl Strategy for Stupid {
@@ -12,7 +13,7 @@ impl Strategy for Stupid {
         let mut attempts = Attempts::new();
 
         for i in 0..6 {
-            let word = Word::new(i).unwrap();
+            let word = Word::from_index(i).unwrap();
             let (_, correct) = puzzle.check(&word, &mut attempts, false).unwrap();
             if correct {
                 break;
