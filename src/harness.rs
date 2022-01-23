@@ -1,7 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use indicatif::{ParallelProgressIterator, ProgressIterator};
-use itertools::Itertools;
+use indicatif::ParallelProgressIterator;
 use rand::seq::index::sample;
 use rayon::prelude::*;
 
@@ -85,23 +84,37 @@ impl Harness {
 
         if let Some(n) = self.num_guesses {
             // try only some random words
-            sample(&mut rng, ANSWERS.len(), n)
-                .iter()
-                .par_bridge()
-                .progress_count(n as u64)
-                .for_each(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+
+            if self.verbose {
+                sample(&mut rng, ANSWERS.len(), n)
+                    .iter()
+                    .par_bridge()
+                    .progress_count(n as u64)
+                    .for_each(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+            } else {
+                sample(&mut rng, ANSWERS.len(), n)
+                    .iter()
+                    .par_bridge()
+                    .for_each(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+            }
         } else {
-            (0..ANSWERS.len())
-                .into_par_iter()
-                .progress()
-                .for_each(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+            if self.verbose {
+                (0..ANSWERS.len())
+                    .into_par_iter()
+                    .progress()
+                    .for_each(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+            } else {
+                (0..ANSWERS.len())
+                    .into_par_iter()
+                    .for_each(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+            }
         }
 
         Arc::try_unwrap(perfs).unwrap().into_inner().unwrap()
     }
 
     fn run_inner(&self, index: usize, perfs: Arc<Mutex<Vec<Perf>>>) {
-        let word = Word::new(index).unwrap();
+        let word = Word::from_index(index).unwrap();
         let puzzle = Puzzle::new(word.clone());
 
         for (i, strategy) in self.strategies.iter().enumerate() {
@@ -116,8 +129,7 @@ impl Harness {
     pub fn run_and_summarize(&self) -> Vec<Perf> {
         let perfs = self.run();
         for perf in &perfs {
-            perf.summarize();
-            println!();
+            println!("{}", perf);
         }
         perfs
     }
