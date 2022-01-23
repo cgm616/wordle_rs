@@ -1,12 +1,11 @@
-use std::collections::HashMap;
 use std::fmt::Display;
 
 use itertools::Itertools;
 use lazy_static::lazy_static;
 
-use wordle_rs::strategy::{Attempts, Grade, Strategy, Word};
+use wordle_rs::strategy::{Attempts, Strategy, Word};
 
-use crate::util::{generate_regex, occurrences, Information};
+use crate::util::{occurrences, Information};
 
 /// A hardmode Wordle strategy that uses pre-computed letter counts
 /// to make better guesses.
@@ -41,7 +40,7 @@ impl Strategy for Common {
                 SORTED
                     .iter()
                     .enumerate()
-                    .filter(|(i, s)| regex.is_match(s.as_bytes()))
+                    .filter(|(_, s)| regex.is_match(s.as_bytes()))
                     .filter(|(_, s)| {
                         let mut works = true;
 

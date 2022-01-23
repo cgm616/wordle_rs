@@ -1,11 +1,11 @@
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 
 use wordle_rs::{
-    strategy::{Attempts, Grade, Puzzle, Strategy, Word},
+    strategy::{Attempts, Puzzle, Strategy, Word},
     words::GUESSES,
 };
 
-use crate::util::{generate_regex, Information};
+use crate::util::Information;
 
 /// A hardmode Wordle strategy that guesses the first word that could be
 /// correct.

@@ -140,12 +140,11 @@ impl Puzzle {
     ///    `soaks`, the first `s` will receive [`Grade::Correct`] and the
     ///    second will receive [`Grade::Incorrect`].
     ///
-    /// The function also updates the [`Attempts`] struct used to track
-    /// a strategy's guesses.
+    /// The function also updates `attempts`. If it is full, this function
+    /// returns an error.
     ///
-    /// When `hardmode` is `true`, this function returns an error if `guess`
-    /// does use all of the information previously provided. If `hardmode` is false,
-    /// this function always returns `Ok(_)`.
+    /// When `hardmode` is `true`, this function also returns an error if `guess`
+    /// does use all of the information previously provided.
     ///
     /// # Examples
     ///
@@ -183,9 +182,9 @@ impl Puzzle {
         guess: &Word,
         attempts: &mut Attempts,
         hardmode: bool,
-    ) -> Result<([Grade; 5], bool), ()> {
-        if let Err(_) = attempts.push(*guess) {
-            return Err(());
+    ) -> Result<([Grade; 5], bool), WordleError> {
+        if attempts.push(*guess).is_err() {
+            return Err(WordleError::OutOfGuesses);
         }
 
         let mut res = [Grade::Incorrect; 5];
@@ -253,7 +252,7 @@ pub enum Grade {
 /// assert_eq!(attempts.inner()[0].deref(), "tithe");
 /// assert!(!attempts.finished());
 /// ```
-#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct Attempts {
     inner: Vec<Word>,
 }
@@ -261,7 +260,7 @@ pub struct Attempts {
 impl Attempts {
     /// Creates a new [`Attempts`].
     pub fn new() -> Self {
-        Attempts { inner: Vec::new() }
+        Self::default()
     }
 
     /// Adds an attempt to an [`Attempts`].
@@ -292,10 +291,7 @@ impl Attempts {
 
     /// Returns true if the last word in this attempt list matches `word`.
     pub(crate) fn solved(&self, word: &Word) -> bool {
-        match self.inner().last() {
-            Some(s) if s == word => true,
-            _ => false,
-        }
+        matches!(self.inner().last(), Some(s) if s == word)
     }
 }
 
