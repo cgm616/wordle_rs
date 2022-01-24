@@ -18,7 +18,7 @@ pub mod stupid;
 /// is validated to ensure that every instance is a possible word.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Hash)]
 pub struct Word {
-    index: usize,
+    pub(crate) index: usize,
 }
 
 impl Word {
@@ -116,7 +116,7 @@ impl Display for Word {
 /// #
 /// # Ok::<_, wordle_rs::WordleError>(())
 /// ```
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Puzzle {
     word: Word,
     pub(crate) poisoned: bool,
