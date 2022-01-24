@@ -12,20 +12,18 @@ pub fn generate_regex<'a>(
     for i in 0..5_usize {
         if let Some((_, c)) = correct.iter().find(|(j, _)| *j == i) {
             str.push(*c);
+        } else if incorrect.is_empty() {
+            str.push_str("[a-z]");
         } else {
-            if incorrect.is_empty() {
-                str.push_str("[a-z]");
-            } else {
-                str.push_str("[^");
+            str.push_str("[^");
 
-                str.push_str(&incorrect);
-                for (d, locator) in almost.clone() {
-                    if *locator & (1 << i) != 0 {
-                        str.push(*d);
-                    }
+            str.push_str(incorrect);
+            for (d, locator) in almost.clone() {
+                if *locator & (1 << i) != 0 {
+                    str.push(*d);
                 }
-                str.push_str("]");
             }
+            str.push(']');
         }
     }
 

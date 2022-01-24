@@ -39,9 +39,8 @@ impl Strategy for Common {
             let guess = Word::from_str(
                 SORTED
                     .iter()
-                    .enumerate()
-                    .filter(|(_, s)| regex.is_match(s.as_bytes()))
-                    .filter(|(_, s)| {
+                    .filter(|s| regex.is_match(s.as_bytes()))
+                    .find(|s| {
                         let mut works = true;
 
                         for (d, _) in info.almost.iter() {
@@ -53,8 +52,6 @@ impl Strategy for Common {
 
                         works
                     })
-                    .next()
-                    .map(|(_, s)| *s)
                     .expect("some word should work!"),
             )
             .unwrap();

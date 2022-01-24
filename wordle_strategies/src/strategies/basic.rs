@@ -13,15 +13,9 @@ use crate::util::Information;
 /// The `Basic` strategy simply looks through the wordlist until it finds
 /// a word that could be the correct answer. It then guesses that word,
 /// learns new information about the answer, and searches again.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Basic {
     first_word: Option<Word>,
-}
-
-impl Default for Basic {
-    fn default() -> Self {
-        Basic { first_word: None }
-    }
 }
 
 impl Basic {
@@ -32,15 +26,11 @@ impl Basic {
     pub fn first_word(self, word: Word) -> Self {
         Basic {
             first_word: Some(word),
-            ..self
         }
     }
 
     pub fn no_first_word(self) -> Self {
-        Basic {
-            first_word: None,
-            ..self
-        }
+        Basic { first_word: None }
     }
 }
 
@@ -50,8 +40,8 @@ impl Strategy for Basic {
         let mut info = Information::new();
 
         while !attempts.finished() {
-            let guess = if self.first_word.is_some() && attempts.inner().len() == 0 {
-                self.first_word.clone().unwrap()
+            let guess = if self.first_word.is_some() && attempts.inner().is_empty() {
+                self.first_word.unwrap()
             } else {
                 let regex = info.hardmode_regex();
                 Word::from_index(
@@ -59,7 +49,7 @@ impl Strategy for Basic {
                         .iter()
                         .enumerate()
                         .filter(|(_, s)| regex.is_match(s.as_bytes()))
-                        .filter(|(_, s)| {
+                        .find(|(_, s)| {
                             let mut works = true;
 
                             for (d, _) in info.almost.iter() {
@@ -71,7 +61,6 @@ impl Strategy for Basic {
 
                             works
                         })
-                        .nth(0)
                         .map(|(i, _)| i)
                         .expect("some word should work!"),
                 )

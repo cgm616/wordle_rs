@@ -9,7 +9,7 @@
 /// word. When it has only one guess left, the strategy will make sure to
 /// always incorporate all of the possible information.
 pub struct Narrowing {
-    hardmode: bool,
+    _hardmode: bool,
 }
 
 // impl Strategy for Narrowing
