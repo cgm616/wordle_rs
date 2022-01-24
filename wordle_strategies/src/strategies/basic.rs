@@ -94,8 +94,8 @@ impl Strategy for Basic {
                 .unwrap()
             };
 
-            let (grades, got_it) = puzzle.check(&guess, &mut attempts).expect(&format!(
-                "for some reason, made incorrect hardmode guess!\nInformation: {info:?}\nattempts:\n{attempts}\n{guess} <-- bad guess here\n",
+            let (grades, got_it) = puzzle.check(&guess, &mut attempts).unwrap_or_else(|e| panic!(
+                "got error while guessing: {e}\nInformation: {info:?}\nattempts:\n{attempts}\n{guess} <-- bad guess here\n",
             ));
             if got_it {
                 break;
