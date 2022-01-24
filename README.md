@@ -1,10 +1,10 @@
 `wordle_rs`
 -----------
 
-![build](https://github.com/cgm616/wordle_rs/actions/workflows/cargo.yml/badge.svg)
-![license](https://img.shields.io/crates/l/wordle_rs)
-![docs](https://img.shields.io/docsrs/wordle_rs)
-![changelog](https://img.shields.io/badge/changelog--blue)
+[![build](https://github.com/cgm616/wordle_rs/actions/workflows/cargo.yml/badge.svg)](https://github.com/cgm616/wordle_rs/actions/workflows/cargo.yml)
+[![license](https://img.shields.io/crates/l/wordle_rs)](https://github.com/cgm616/wordle_rs/blob/master/LICENSE)
+[![docs](https://img.shields.io/docsrs/wordle_rs)](https://docs.rs/wordle_rs/latest/wordle_rs/)
+[![changelog](https://img.shields.io/badge/changelog--blue)](https://github.com/cgm616/wordle_rs/blob/master/CHANGELOG.md)
 
 Have you ever gotten so obsessed with [Wordle](https://www.powerlanguage.co.uk/wordle/) that you wanted to evaluate different strategies programmatically? If so, you're in the right place.
 
