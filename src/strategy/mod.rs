@@ -64,6 +64,7 @@ impl Word {
     /// #
     /// # Ok::<_, wordle_rs::WordleError>(())
     /// ```
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(word: &str) -> Result<Self, WordleError> {
         GUESSES
             .binary_search(&word)
@@ -128,10 +129,6 @@ impl Puzzle {
             word,
             poisoned: false,
         }
-    }
-
-    pub(crate) fn clone(&self) -> Self {
-        Puzzle { ..*self }
     }
 
     /// Checks if a guess is correct and returns partial information.
