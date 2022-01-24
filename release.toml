@@ -10,3 +10,4 @@ sign-commit = true
 sign-tag = true
 push-remote = "github"
 allow-branch = ["master"]
+consolidate-commits = true
