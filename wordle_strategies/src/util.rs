@@ -1,11 +1,14 @@
-use regex::bytes::{Regex, RegexBuilder};
 use std::collections::{BTreeMap, HashMap};
+
+use itertools::Itertools;
+use regex::bytes::{Regex, RegexBuilder};
+
 use wordle_rs::strategy::{Grade, Word};
 
 pub fn generate_regex<'a>(
     correct: &[(usize, char)],
     incorrect: &str,
-    almost: impl IntoIterator<Item = (&'a char, &'a u8)> + Clone,
+    almost: impl IntoIterator<Item = (&'a char, &'a (u8, u8))> + Clone,
 ) -> Regex {
     let mut str = String::new();
 
@@ -18,8 +21,8 @@ pub fn generate_regex<'a>(
             str.push_str("[^");
 
             str.push_str(incorrect);
-            for (d, locator) in almost.clone() {
-                if *locator & (1 << i) != 0 {
+            for (d, (loc, _)) in almost.clone() {
+                if loc & (1 << i) != 0 {
                     str.push(*d);
                 }
             }
@@ -62,11 +65,11 @@ pub fn occurrences(c: char) -> u32 {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Information {
     pub correct: Vec<(usize, char)>,
     pub incorrect: String,
-    pub almost: HashMap<char, u8>,
+    pub almost: HashMap<char, (u8, u8)>,
 }
 
 impl Information {
@@ -75,14 +78,39 @@ impl Information {
     }
 
     pub fn update(&mut self, guess: &Word, grades: &[Grade]) {
-        for (i, (grade, c)) in grades.iter().zip(guess.chars()).enumerate() {
+        let mut almost_lookup = [0_u8; 26];
+        const A_ASCII: usize = 0x61;
+        let index = |c: char| c as usize - A_ASCII;
+
+        for (i, (grade, c)) in grades
+            .iter()
+            .zip(guess.chars())
+            .enumerate()
+            .sorted_unstable_by_key(|(_, (g, _))| match g {
+                Grade::Correct => 1,
+                Grade::Almost => 2,
+                Grade::Incorrect => 3,
+            })
+        {
             match grade {
-                Grade::Correct => self.correct.push((i, c)),
-                Grade::Almost => {
-                    let locator = self.almost.entry(c).or_insert(0);
-                    *locator |= 1 << i;
+                Grade::Correct => {
+                    if !self.correct.iter().any(|&e| e.0 == i) {
+                        self.correct.push((i, c));
+                    }
                 }
-                Grade::Incorrect => self.incorrect.push(c),
+                Grade::Almost => {
+                    let (loc, count) = self.almost.entry(c).or_insert((0, 0));
+                    *loc |= 1 << i;
+                    almost_lookup[index(c)] += 1;
+                    if *count < almost_lookup[index(c)] {
+                        *count = almost_lookup[index(c)];
+                    }
+                }
+                Grade::Incorrect => {
+                    if !self.almost.contains_key(&c) && !self.incorrect.contains(c) {
+                        self.incorrect.push(c)
+                    }
+                }
             }
         }
     }
