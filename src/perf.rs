@@ -124,8 +124,7 @@ impl Perf {
             .iter()
             .filter(|(word, attempts)| attempts.solved(word))
             .map(|(_, attempts)| attempts.inner().len())
-            .filter(|&n| n <= 6)
-            .for_each(|n| histogram[n] += 1);
+            .for_each(|n| histogram[n - 1] += 1);
 
         assert_eq!(
             histogram.iter().sum::<u32>(),
