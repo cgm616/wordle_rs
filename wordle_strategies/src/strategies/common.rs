@@ -3,7 +3,7 @@ use std::fmt::Display;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 
-use wordle_rs::strategy::{Attempts, Strategy, Word};
+use wordle_rs::strategy::{Attempts, AttemptsKey, Strategy, Word};
 
 use crate::util::{occurrences, Information};
 
@@ -17,7 +17,7 @@ use crate::util::{occurrences, Information};
 pub struct Common;
 
 impl Strategy for Common {
-    fn solve(&self, puzzle: &wordle_rs::strategy::Puzzle) -> wordle_rs::strategy::Attempts {
+    fn solve(&self, puzzle: &mut wordle_rs::strategy::Puzzle, key: AttemptsKey) -> Attempts {
         lazy_static! {
             static ref SORTED: Vec<&'static str> = {
                 let mut words = Vec::from(wordle_rs::words::GUESSES);
@@ -31,7 +31,7 @@ impl Strategy for Common {
             };
         }
 
-        let mut attempts = Attempts::new();
+        let mut attempts = key.unlock();
         let mut info = Information::new();
 
         while !attempts.finished() {
@@ -59,7 +59,7 @@ impl Strategy for Common {
             )
             .unwrap();
 
-            let (grades, got_it) = puzzle.check(&guess, &mut attempts, true).unwrap();
+            let (grades, got_it) = puzzle.check(&guess, &mut attempts).unwrap();
             if got_it {
                 break;
             }

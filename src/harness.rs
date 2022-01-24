@@ -8,8 +8,9 @@ use rayon::prelude::*;
 
 use crate::{
     perf::Perf,
-    strategy::{Puzzle, Strategy, Word},
+    strategy::{AttemptsKey, Puzzle, Strategy, Word},
     words::ANSWERS,
+    WordleError,
 };
 
 /// A test harness that can run many strategies on many puzzles.
@@ -112,7 +113,7 @@ impl Harness {
     ///
     /// The [`Perf`]s will be in the same order as the strategies were added
     /// to the harness.
-    pub fn run(&self) -> Vec<Perf> {
+    pub fn run(&self) -> Result<Vec<Perf>, WordleError> {
         let perfs = Arc::new(Mutex::new(Vec::new()));
         {
             let mut perfs = perfs.lock().unwrap();
@@ -131,12 +132,14 @@ impl Harness {
                     .iter()
                     .par_bridge()
                     .progress_count(n as u64)
-                    .for_each(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+                    .map(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+                    .collect::<Result<(), WordleError>>()?;
             } else {
                 sample(&mut rng, ANSWERS.len(), n)
                     .iter()
                     .par_bridge()
-                    .for_each(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+                    .map(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+                    .collect::<Result<(), WordleError>>()?;
             }
         } else {
             // try all words
@@ -145,37 +148,45 @@ impl Harness {
                 (0..ANSWERS.len())
                     .into_par_iter()
                     .progress()
-                    .for_each(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+                    .map(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+                    .collect::<Result<(), WordleError>>()?;
             } else {
                 (0..ANSWERS.len())
                     .into_par_iter()
-                    .for_each(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+                    .map(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+                    .collect::<Result<(), WordleError>>()?;
             }
         }
 
-        Arc::try_unwrap(perfs).unwrap().into_inner().unwrap()
+        Ok(Arc::try_unwrap(perfs).unwrap().into_inner().unwrap())
     }
 
-    fn run_inner(&self, index: usize, perfs: Arc<Mutex<Vec<Perf>>>) {
+    fn run_inner(&self, index: usize, perfs: Arc<Mutex<Vec<Perf>>>) -> Result<(), WordleError> {
         let word = Word::from_index(index).unwrap();
-        let puzzle = Puzzle::new(word);
+        let mut puzzle = Puzzle::new(word);
 
         for (i, strategy) in self.strategies.iter().enumerate() {
-            let solution = strategy.solve(&puzzle);
+            let key = AttemptsKey::new(strategy.hardmode());
+            let solution = strategy.solve(&mut puzzle, key);
             {
                 let mut perfs = perfs.lock().unwrap();
                 perfs[i].tries.push((word, solution));
             }
+            if puzzle.poisoned {
+                return Err(WordleError::StrategyCheated(format!("{}", strategy)));
+            }
         }
+
+        Ok(())
     }
 
     /// Runs the harness (see [`run()`](Harness::run())) and prints performance
     /// summaries of each strategy.
-    pub fn run_and_summarize(&self) -> Vec<Perf> {
-        let perfs = self.run();
+    pub fn run_and_summarize(&self) -> Result<Vec<Perf>, WordleError> {
+        let perfs = self.run()?;
         for perf in &perfs {
             println!("{}", perf);
         }
-        perfs
+        Ok(perfs)
     }
 }

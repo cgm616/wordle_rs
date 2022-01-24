@@ -2,7 +2,7 @@
 
 use std::fmt::Display;
 
-use crate::strategy::{Attempts, Puzzle, Strategy, Word};
+use crate::strategy::{Attempts, AttemptsKey, Puzzle, Strategy, Word};
 
 /// A Wordle strategy that only ever guesses the first few words in the wordlist.
 ///
@@ -13,12 +13,12 @@ use crate::strategy::{Attempts, Puzzle, Strategy, Word};
 pub struct Stupid;
 
 impl Strategy for Stupid {
-    fn solve(&self, puzzle: &Puzzle) -> Attempts {
-        let mut attempts = Attempts::new();
+    fn solve(&self, puzzle: &mut Puzzle, key: AttemptsKey) -> Attempts {
+        let mut attempts = key.unlock();
 
         for i in 0..6 {
             let word = Word::from_index(i).unwrap();
-            let (_, correct) = puzzle.check(&word, &mut attempts, false).unwrap();
+            let (_, correct) = puzzle.check(&word, &mut attempts).unwrap();
             if correct {
                 break;
             }

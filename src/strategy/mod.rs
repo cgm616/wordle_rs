@@ -5,6 +5,7 @@ use std::{
     ops::Deref,
 };
 
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::{words::GUESSES, WordleError};
@@ -92,29 +93,45 @@ impl Display for Word {
 /// whether or not a guess is correct, and it will return all of the partial
 /// information that Wordle provides.
 ///
+/// When an [`Attempts`] created with the [`cheat()`](Attempts::cheat())
+/// function is passed to [`check()`](Puzzle::check()), the puzzle will
+/// become "poisoned." The [test harness](crate::Harness) checks for this
+/// and will refuse to produce performance results for a strategy that has
+/// passed such an instance to its puzzle.
+///
 /// # Examples
 ///
 /// Here, we create a new puzzle and solve it with a bad strategy.
 ///
 /// ```rust
 /// # use wordle_rs::strategy::Word;
-/// use wordle_rs::{strategy::{stupid::Stupid, Puzzle}, Strategy};
+/// use wordle_rs::{strategy::{stupid::Stupid, Puzzle, AttemptsKey}, Strategy};
 ///
-/// let puzzle = Puzzle::new(Word::from_str("earth")?);
+/// let mut puzzle = Puzzle::new(Word::from_str("earth")?);
+/// let key = AttemptsKey::new_cheat(false);
 /// let strategy = Stupid;
-/// let attempts = strategy.solve(&puzzle);
+///
+/// let attempts = strategy.solve(&mut puzzle, key);
 /// #
 /// # Ok::<_, wordle_rs::WordleError>(())
 /// ```
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct Puzzle {
     word: Word,
+    pub(crate) poisoned: bool,
 }
 
 impl Puzzle {
     /// Creates a new puzzle from a [`Word`].
     pub fn new(word: Word) -> Self {
-        Puzzle { word }
+        Puzzle {
+            word,
+            poisoned: false,
+        }
+    }
+
+    pub(crate) fn clone(&self) -> Self {
+        Puzzle { ..*self }
     }
 
     /// Checks if a guess is correct and returns partial information.
@@ -143,8 +160,9 @@ impl Puzzle {
     /// The function also updates `attempts`. If it is full, this function
     /// returns an error.
     ///
-    /// When `hardmode` is `true`, this function also returns an error if `guess`
-    /// does use all of the information previously provided.
+    /// When the strategy reports that it runs on hardmode, this function also
+    /// returns an error if `guess` does use all of the information previously
+    /// provided.
     ///
     /// # Examples
     ///
@@ -152,58 +170,132 @@ impl Puzzle {
     /// # use wordle_rs::strategy::Puzzle;
     /// use wordle_rs::strategy::{Word, Attempts, Grade::*};
     ///
-    /// let puzzle = Puzzle::new(Word::from_str("earth")?);
-    /// let mut attempts = Attempts::new();
+    /// let mut puzzle = Puzzle::new(Word::from_str("earth")?);
+    /// let mut attempts = Attempts::cheat(true);
     ///
     /// // The first guess always succeeds.
     /// let (grades, correct) = puzzle
-    ///     .check(&Word::from_str("ratio")?, &mut attempts, true)
+    ///     .check(&Word::from_str("ratio")?, &mut attempts)
     ///     .unwrap();
     /// assert!(!correct);
     /// assert_eq!(grades, [Almost, Correct, Almost, Incorrect, Incorrect]);
     /// assert_eq!(attempts.inner().len(), 1);
     ///
     /// // This guess does not incorporate all of the information, so it should fail!
-    /// assert!(puzzle.check(&Word::from_str("trick")?, &mut attempts, true).is_err());
+    /// assert!(puzzle.check(&Word::from_str("trick")?, &mut attempts).is_err());
     /// assert_eq!(attempts.inner().len(), 1);
     ///
-    /// // Guessing the same word on easymode is okay.
-    /// let (grades, correct) = puzzle
-    ///     .check(&Word::from_str("trick")?, &mut attempts, false)
-    ///     .unwrap();
-    /// assert!(!correct);
-    /// assert_eq!(grades, [Almost, Almost, Incorrect, Incorrect, Incorrect]);
-    /// assert_eq!(attempts.inner().len(), 2);
-    ///
+    /// // Attempting the same sequence of guesses is okay on easymode.
+    /// let mut attempts = Attempts::cheat(false);
+    /// let _ = puzzle.check(&Word::from_str("ratio")?, &mut attempts).unwrap();
+    /// let _ = puzzle.check(&Word::from_str("trick")?, &mut attempts).unwrap();
+    /// #
     /// # Ok::<_, wordle_rs::WordleError>(())
     /// ```
     pub fn check(
-        &self,
+        &mut self,
         guess: &Word,
         attempts: &mut Attempts,
-        hardmode: bool,
     ) -> Result<([Grade; 5], bool), WordleError> {
+        if attempts.cheat {
+            self.poisoned = true;
+        }
+
+        if attempts.hard {
+            for previous in attempts.inner().iter().rev() {
+                let (previous_grades, _) = self.check_inner(previous);
+                self.hardmode_guard(previous, &previous_grades, guess)?;
+            }
+        }
+
         if attempts.push(*guess).is_err() {
             return Err(WordleError::OutOfGuesses);
         }
 
+        Ok(self.check_inner(guess))
+    }
+
+    fn check_inner(&self, guess: &Word) -> ([Grade; 5], bool) {
+        use std::cmp::Ordering;
+
+        let mut used = String::new();
         let mut res = [Grade::Incorrect; 5];
         let mut correct = true;
-        for (i, (guess, answer)) in guess.chars().zip(self.word.chars()).enumerate() {
+
+        // go through correct letters first, since those get priority
+        for (i, (guess, answer)) in guess
+            .chars()
+            .zip(self.word.chars())
+            .enumerate()
+            .sorted_unstable_by(|&(a_i, (a_guess, a_answer)), &(b_i, (b_guess, b_answer))| {
+                let a_correct = a_guess == a_answer;
+                let b_correct = b_guess == b_answer;
+                match a_correct.cmp(&b_correct).reverse() {
+                    Ordering::Equal => a_i.cmp(&b_i),
+                    other => other,
+                }
+            })
+        {
             if guess == answer {
+                used.push(guess);
                 res[i] = Grade::Correct;
-            } else if self.word.contains(guess) {
-                res[i] = Grade::Almost;
-                correct = false;
             } else {
-                correct = false;
+                match self.word.chars().filter(|&c| c == guess).count() {
+                    0 => correct = false,
+                    n if n >= 1 && used.chars().filter(|&c| c == guess).count() < n => {
+                        used.push(guess);
+                        res[i] = Grade::Almost;
+                        correct = false;
+                    }
+                    _ => correct = false,
+                }
             }
         }
 
-        // TODO: follow hardmode rules
-        // TODO: fix multiple letter problems (see docs and tests)
+        (res, correct)
+    }
 
-        Ok((res, correct))
+    fn hardmode_guard(
+        &self,
+        previous: &Word,
+        grades: &[Grade],
+        guess: &Word,
+    ) -> Result<(), WordleError> {
+        // We need to check that `guess` incorporates all _revealed_ guesses.
+        // That means that it uses the all of the almosts and correctly uses
+        // all of the corrects.
+        let mut almost_lookup = [0_u8; 26];
+        const A_ASCII: usize = 0x61;
+        let i = |c: char| c as usize - A_ASCII;
+
+        for (prev, grade, new) in previous
+            .chars()
+            .zip(grades.iter())
+            .zip(guess.chars())
+            .map(|c| (c.0 .0, c.0 .1, c.1))
+            .sorted_unstable_by_key(|c| c.1)
+        {
+            match grade {
+                Grade::Correct => {
+                    // make sure prev == new since they know where this letter goes
+                    if prev != new {
+                        return Err(WordleError::InvalidHardmodeGuess);
+                    }
+                }
+                Grade::Incorrect => {}
+                Grade::Almost => {
+                    // make sure that enough of this letter are in the word
+                    almost_lookup[i(prev)] += 1;
+                    if guess.chars().filter(|&c| c == prev).count()
+                        < almost_lookup[i(prev)] as usize
+                    {
+                        return Err(WordleError::InvalidHardmodeGuess);
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -226,6 +318,30 @@ pub enum Grade {
     Incorrect,
 }
 
+/// A key provided to [`Strategy::solve()`] to produce [`Attempts`].
+///
+/// This exists to allow strategies to produce only one instance of
+/// [`Attempts`] while running.
+pub struct AttemptsKey {
+    hard: bool,
+    cheat: bool,
+}
+
+impl AttemptsKey {
+    pub(crate) fn new(hard: bool) -> AttemptsKey {
+        AttemptsKey { hard, cheat: false }
+    }
+
+    pub fn new_cheat(hard: bool) -> AttemptsKey {
+        AttemptsKey { hard, cheat: true }
+    }
+
+    /// Use the key to produce an instance of [`Attempts`].
+    pub fn unlock(self) -> Attempts {
+        Attempts::new(self.hard, self.cheat)
+    }
+}
+
 /// A collection of attempts to solve a Wordle puzzle.
 ///
 /// Strategies must return this, and the struct simply wraps a [`Vec`] to
@@ -242,25 +358,43 @@ pub enum Grade {
 /// # use wordle_rs::strategy::Attempts;
 /// use wordle_rs::strategy::{Puzzle, Word};
 ///
-/// let mut attempts = Attempts::new();
+/// let mut attempts = Attempts::cheat(true);
 /// let mut puzzle = Puzzle::new(Word::from_str("limit").unwrap());
 /// let (_, _) = puzzle
-///     .check(&Word::from_str("tithe").unwrap(), &mut attempts, true)
+///     .check(&Word::from_str("tithe").unwrap(), &mut attempts)
 ///     .unwrap();
 ///
 /// assert_eq!(attempts.inner().len(), 1);
 /// assert_eq!(attempts.inner()[0].deref(), "tithe");
 /// assert!(!attempts.finished());
 /// ```
-#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct Attempts {
     inner: Vec<Word>,
+    pub(crate) hard: bool,
+    pub(crate) cheat: bool,
 }
 
 impl Attempts {
     /// Creates a new [`Attempts`].
-    pub fn new() -> Self {
-        Self::default()
+    pub(crate) fn new(hard: bool, cheat: bool) -> Self {
+        Attempts {
+            hard,
+            cheat,
+            ..Self::default()
+        }
+    }
+
+    /// Creates a new [`Attempts`] for use other than in a strategy.
+    ///
+    /// Passing this instance to [`Puzzle::check()`] will poison the puzzle,
+    /// so do not use attempts created in this way inside [`Strategy::solve()`]!
+    pub fn cheat(hard: bool) -> Self {
+        Attempts {
+            hard,
+            cheat: true,
+            ..Self::default()
+        }
     }
 
     /// Adds an attempt to an [`Attempts`].
@@ -335,7 +469,7 @@ impl Display for Attempts {
 ///
 /// ``` rust
 /// # use std::fmt::Display;
-/// # use wordle_rs::{Strategy, strategy::{Puzzle, Attempts}};
+/// # use wordle_rs::{Strategy, strategy::{Puzzle, Attempts, AttemptsKey}};
 /// #
 /// # #[derive(Debug)]
 /// # struct MyCoolStrategy;
@@ -345,7 +479,7 @@ impl Display for Attempts {
 /// #         write!(f, "MyCoolStrategy")
 /// #     }
 /// # }
-///
+/// #
 /// impl Strategy for MyCoolStrategy {
 ///     fn version(&self) -> &'static str {
 ///         "0.1.0"
@@ -354,8 +488,10 @@ impl Display for Attempts {
 ///     fn hardmode(&self) -> bool {
 ///         true
 ///     }
+///
+///     // snip
 /// #
-/// #    fn solve(&self, puzzle: &Puzzle) -> Attempts {
+/// #    fn solve(&self, puzzle: &mut Puzzle, key: AttemptsKey) -> Attempts {
 /// #        todo!()
 /// #    }
 /// }
@@ -372,7 +508,7 @@ impl Display for Attempts {
 /// # #[derive(Debug)]
 /// # struct MyCoolStrategy;
 /// #
-/// use wordle_rs::strategy::{Puzzle, Attempts, Word};
+/// use wordle_rs::strategy::{Puzzle, Attempts, AttemptsKey, Word};
 ///
 /// # impl Display for MyCoolStrategy {
 /// #     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -380,7 +516,9 @@ impl Display for Attempts {
 /// #     }
 /// # }
 /// #
-/// # impl Strategy for MyCoolStrategy {
+/// impl Strategy for MyCoolStrategy {
+///
+///     // snip
 /// #     fn version(&self) -> &'static str {
 /// #         "0.1.0"
 /// #     }
@@ -388,24 +526,25 @@ impl Display for Attempts {
 /// #     fn hardmode(&self) -> bool {
 /// #         true
 /// #     }
-/// #
-/// #
-/// fn solve(&self, puzzle: &Puzzle) -> Attempts {
-///     let mut attempts = Attempts::new();
-///     while !attempts.finished() {
-///         // Make guesses!
-///         let (_, _) = puzzle.check(&Word::from_str("tithe").unwrap(), &mut attempts, false).unwrap();
+///
+///     fn solve(&self, puzzle: &mut Puzzle, key: AttemptsKey) -> Attempts {
+///         let mut attempts = key.unlock();
+///         while !attempts.finished() {
+///             // Make guesses!
+///             let (_, _) = puzzle.check(&Word::from_str("tithe").unwrap(), &mut attempts).unwrap();
+///         }
+///         attempts
 ///     }
-///     attempts
 /// }
-/// # }
 /// ```
 pub trait Strategy: Display + Debug + Sync {
     /// Tries to solve the given [`Puzzle`] and returns a list of attempts.
     ///
     /// This is the main function to implement in this trait. The list of
-    /// attempts is managed by the `puzzle` parameter.
-    fn solve(&self, puzzle: &Puzzle) -> Attempts;
+    /// attempts is managed by the `puzzle` parameter. Use the `key`
+    /// parameter to produce the [`Attempts`] to return via
+    /// [`AttemptsKey::unlock()`].
+    fn solve(&self, puzzle: &mut Puzzle, key: AttemptsKey) -> Attempts;
 
     /// Provides a version for this strategy.
     ///
@@ -429,41 +568,142 @@ mod test {
     use super::*;
     use crate::WordleError;
 
-    #[test]
-    fn repeat_letter_guesses() -> Result<(), WordleError> {
-        use Grade::*;
-
-        let mut attempts = Attempts::new();
-        let puzzle = Puzzle::new(Word::from_str("sober")?);
-
-        let (grades, correct) = puzzle
-            .check(&Word::from_str("spool")?, &mut attempts, true)
-            .unwrap();
-        assert!(!correct);
-        assert_eq!(grades, [Correct, Incorrect, Almost, Incorrect, Incorrect]);
-
-        let (grades, correct) = puzzle
-            .check(&Word::from_str("soaks")?, &mut attempts, true)
-            .unwrap();
-        assert!(!correct);
-        assert_eq!(grades, [Correct, Correct, Incorrect, Incorrect, Incorrect]);
-
-        Ok(())
+    fn str_to_grades(input: &str) -> [Grade; 5] {
+        let mut res = [Grade::Incorrect; 5];
+        for (i, c) in input.chars().enumerate() {
+            match c {
+                'c' => res[i] = Grade::Correct,
+                'a' => res[i] = Grade::Almost,
+                _ => {}
+            }
+        }
+        res
     }
 
-    #[test]
-    fn repeat_letter_answer() -> Result<(), WordleError> {
-        use Grade::*;
+    macro_rules! puzzle_test {
+        (I $answer:expr; $puzzle:ident, $attempts:ident, $count:ident; $guess:expr, $works:expr, $res:expr) => {{
+            if $works {
+                let (grades, correct) = $puzzle
+                    .check(&Word::from_str($guess)?, &mut $attempts)
+                    .unwrap();
+                $count += 1;
+                assert_eq!($attempts.inner().len(), $count);
+                assert_eq!(correct, $answer == $guess);
+                assert_eq!(grades, str_to_grades($res));
+            } else {
+                assert!($puzzle
+                    .check(&Word::from_str($guess)?, &mut $attempts)
+                    .is_err());
+            }
+        }};
 
-        let mut attempts = Attempts::new();
-        let puzzle = Puzzle::new(Word::from_str("spoon")?);
+        ($fn_name:ident[hard = $hard:expr, $answer:expr => $( [$guess:expr, $works:expr, $res:expr] );*]) => {
+            puzzle_test! { $fn_name [hard = $hard, $answer => $( [$guess, $works, $res] );*] {} }
+        };
 
-        let (grades, correct) = puzzle
-            .check(&Word::from_str("odors")?, &mut attempts, true)
-            .unwrap();
-        assert!(!correct);
-        assert_eq!(grades, [Almost, Incorrect, Correct, Incorrect, Almost]);
+        ($fn_name:ident[hard = $hard:expr, $answer:expr => $( [$guess:expr, $works:expr, $res:expr] );*] $other:block) => {
+            #[test]
+            fn $fn_name() -> Result<(), WordleError> {
+                let mut attempts = Attempts::cheat($hard);
+                let mut puzzle = Puzzle::new(Word::from_str($answer)?);
+                let mut count = 0;
 
-        Ok(())
+                $(puzzle_test!(I $answer; puzzle, attempts, count; $guess, $works, $res);)*
+
+                $other
+
+                Ok(())
+            }
+        };
+    }
+
+    puzzle_test! { repeat_letter_guesses [hard = true, "sober" =>
+        ["spool", true, "ciaii"];
+        ["soaks", true, "cciii"]]
+    }
+
+    puzzle_test! { repeat_letter_guesses_before [hard = true, "tills" =>
+        ["pines", true, "iciic"];
+        ["sills", true, "icccc"]]
+    }
+
+    puzzle_test! { repeat_letter_answer [hard = true, "spoon" =>
+        ["odors", true, "aicia"]]
+    }
+
+    // A test taken directly from the hardmode behavior of Wordle 218.
+    puzzle_test! { wordle_crimp_props_primp [hard = true, "crimp" =>
+        ["props", true, "aciii"];
+        ["pinup", false, ""];
+        ["primp", true, "icccc"];
+        ["crimp", true, "ccccc"]]
+    }
+
+    // A test taken directly from the hardmode behavior of Wordle 218.
+    puzzle_test! { wordle_crimp_error_order_trier [hard = true, "crimp" =>
+        ["error", true, "iciii"];
+        ["order", true, "iciii"];
+        ["right", false, ""];
+        ["trier", true, "iccii"];
+        ["crimp", true, "ccccc"]]
+    }
+
+    // A test taken directly from the hardmode behavior of Wordle 218.
+    puzzle_test! { wordle_crimp_lints_limit_minis [hard = true, "crimp" =>
+        ["lints", true, "iaiii"];
+        ["limit", true, "iaaii"];
+        ["lipid", false, ""];
+        ["minis", true, "aaiii"];
+        ["crimp", true, "ccccc"]]
+    }
+
+    // A test taken directly from the hardmode behavior of Wordle 218.
+    puzzle_test! { wordle_crimp_bolts_prick [hard = true, "crimp" =>
+        ["bolts", true, "iiiii"];
+        ["prick", true, "accai"];
+        ["crimp", true, "ccccc"]]
+    }
+
+    puzzle_test! { filling_up [hard = true, "right" =>
+        ["allay", true, "iiiii"];
+        ["tough", true, "aiiaa"];
+        ["spits", false, ""];
+        ["might", true, "icccc"];
+        ["night", true, "icccc"];
+        ["fight", true, "icccc"];
+        ["sight", true, "icccc"]]
+    }
+
+    puzzle_test! { repeat_hardmode_almost[hard = true, "spill" =>
+        ["alloy", true, "iaaii"];
+        ["limes", false, ""];
+        ["spilt", false, ""];
+        ["level", true, "aiiic"];
+        ["petal", false, ""];
+        ["spill", true, "ccccc"]]
+    }
+
+    puzzle_test! { more_are_allowed[hard = true, "earth" =>
+        ["alloy", true, "aiiii"];
+        ["drama", true, "iaaii"]]
+    }
+
+    puzzle_test! { hardmode_correct[hard = true, "tills" =>
+        ["pines", true, "iciic"];
+        ["butts", false, ""];
+        ["right", false, ""];
+        ["earth", false, ""];
+        ["mills", true, "icccc"];
+        ["tight", false, ""];
+        ["tails", false, ""];
+        ["sills", true, "icccc"];
+        ["tills", true, "ccccc"]]
+    }
+
+    puzzle_test! { hardmode_almost[hard = true, "spots" =>
+        ["crass", true, "iiiac"];
+        ["wisps", true, "iiaac"];
+        ["slots", false, ""];
+        ["spots", true, "ccccc"]]
     }
 }

@@ -29,4 +29,14 @@ pub enum WordleError {
     /// The puzzle has already evaluated six guesses.
     #[error("the puzzle has already evaluated six guesses")]
     OutOfGuesses,
+
+    /// The word provided to [`Puzzle::guess()`](strategy::Puzzle::guess())
+    /// does not follow Wordle hardmode rules.
+    #[error("that guess does not follow hardmode rules")]
+    InvalidHardmodeGuess,
+
+    /// A strategy created an unauthorized instance of [`Attempts`] and used it
+    /// to gain more information about its puzzle.
+    #[error("the strategy {0} cheated")]
+    StrategyCheated(String),
 }

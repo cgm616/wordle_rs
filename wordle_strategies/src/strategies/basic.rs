@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use wordle_rs::{
-    strategy::{Attempts, Puzzle, Strategy, Word},
+    strategy::{Attempts, AttemptsKey, Puzzle, Strategy, Word},
     words::GUESSES,
 };
 
@@ -45,8 +45,8 @@ impl Basic {
 }
 
 impl Strategy for Basic {
-    fn solve(&self, puzzle: &Puzzle) -> Attempts {
-        let mut attempts = Attempts::new();
+    fn solve(&self, puzzle: &mut Puzzle, key: AttemptsKey) -> Attempts {
+        let mut attempts = key.unlock();
         let mut info = Information::new();
 
         while !attempts.finished() {
@@ -78,7 +78,7 @@ impl Strategy for Basic {
                 .unwrap()
             };
 
-            let (grades, got_it) = puzzle.check(&guess, &mut attempts, true).unwrap();
+            let (grades, got_it) = puzzle.check(&guess, &mut attempts).unwrap();
             if got_it {
                 break;
             }
