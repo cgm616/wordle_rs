@@ -8,6 +8,7 @@
 /// On easymode, the strategy is able to guess the most-narrowing possible next
 /// word. When it has only one guess left, the strategy will make sure to
 /// always incorporate all of the possible information.
+#[doc(hidden)]
 pub struct Narrowing {
     _hardmode: bool,
 }
