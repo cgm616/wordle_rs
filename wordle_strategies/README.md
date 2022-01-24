@@ -1,9 +1,9 @@
-`wordle_rs`
+`wordle_strategies`
 -----------
 
 [![build](https://github.com/cgm616/wordle_rs/actions/workflows/cargo.yml/badge.svg)](https://github.com/cgm616/wordle_rs/actions/workflows/cargo.yml)
 [![license](https://img.shields.io/crates/l/wordle_strategies)](https://github.com/cgm616/wordle_rs/blob/master/LICENSE)
-[![docs](https://img.shields.io/docsrs/wordle_strategies)](https://docs.rs/wordle_rs/latest/wordle_rs/)
+[![docs](https://img.shields.io/docsrs/wordle_strategies)](https://docs.rs/wordle_strategies/latest/wordle_strategies/)
 [![changelog](https://img.shields.io/badge/changelog--blue)](https://github.com/cgm616/wordle_rs/blob/master/CHANGELOG.md)
 
 Have you ever gotten so obsessed with [Wordle](https://www.powerlanguage.co.uk/wordle/) that you wanted to evaluate different strategies programmatically? If so, you're in the right place.
