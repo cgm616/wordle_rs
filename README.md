@@ -57,4 +57,4 @@ Forthcoming.
 
 ## License
 
-Everything in this repository is licensed under the [MIT license](LICENSE).
+Everything in this project is licensed under the [MIT license](LICENSE).
