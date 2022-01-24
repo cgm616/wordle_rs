@@ -384,8 +384,8 @@ impl Attempts {
 
     /// Creates a new [`Attempts`] for use other than in a strategy.
     ///
-    /// Passing this instance to [`Puzzle::check()`] will poison the puzzle,
-    /// so do not use attempts created in this way inside [`Strategy::solve()`]!
+    /// Passing an instance created this way to [`Puzzle::check()`] will poison
+    /// the puzzle, so do not use do that inside [`Strategy::solve()`]!
     pub fn cheat(hard: bool) -> Self {
         Attempts {
             hard,
