@@ -12,6 +12,7 @@ use crate::util::occurrences;
 /// An easymode Wordle strategy that works the same way as
 /// [Common](crate::Common) but makes calculated easymode guesses.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[doc(hidden)]
 pub struct CommonEasy;
 
 impl Strategy for CommonEasy {

@@ -1,3 +1,8 @@
+//! Some strategies for use with `wordle_rs`.
+//!
+//! Each strategy consists of a single struct, and everything you need to
+//! configure the strategy should exist as a method.
+
 mod basic;
 pub use basic::Basic;
 

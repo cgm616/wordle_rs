@@ -13,6 +13,14 @@ use crate::util::{occurrences, Information};
 /// Each round, it will guess the next word that could be the answer (given
 /// what it knows) containing the most common letters. It is essentially the
 /// same as [Basic](crate::Basic) but a little smarter.
+///
+/// This strategy has no configuration, so you can simply instantiate it
+/// with its name:
+///
+/// ```rust
+/// # use wordle_strategies::Common;
+/// let strategy = Common;
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Common;
 
