@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - ReleaseDate
 
+###
+- Fixed problem that caused the wrong readme to appear on crates.io for `wordle_strategies`
+
 ## [0.1.1] - 2022-01-24
 
 ### Changes
