@@ -12,8 +12,7 @@ use crate::strategy::{Attempts, Strategy, Word};
 ///
 /// This struct can provide statistics about the attempts on its own, but it
 /// is recommended to produce [`PerfSummary`] first to cache the computations.
-/// [`PerfSummary`] is also much cheaper to write to disk.
-#[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Perf {
     pub(crate) tries: Vec<(Word, Attempts)>,
     strategy_name: String,
