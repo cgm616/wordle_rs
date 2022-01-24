@@ -1,6 +1,6 @@
 [package]
 name = "wordle_strategies"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["cgm616 <cargo@cgm616.me>"]
 rust-version = "1.58"
