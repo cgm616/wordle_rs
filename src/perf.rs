@@ -191,7 +191,11 @@ impl<'a> PerfSummary<'a> {
 
     /// Gets the number of guesses across all solved puzzles.
     pub fn cumulative_guesses_solved(&self) -> u32 {
-        self.histogram.iter().sum::<u32>()
+        self.histogram
+            .iter()
+            .enumerate()
+            .map(|(i, v)| i as u32 * v)
+            .sum::<u32>()
     }
 
     /// Gets the average number of guesses needed to solve a puzzle.
