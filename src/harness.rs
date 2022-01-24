@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use indicatif::{ParallelProgressIterator, ProgressIterator};
+use indicatif::ParallelProgressIterator;
 use rand::seq::index::sample;
 use rayon::prelude::*;
 
@@ -138,12 +138,12 @@ impl Harness {
                     })
                 }
                 .map_or_else(
-                    |e| {
+                    |_| {
                         println!("strategy {strategy} panicked on puzzle {word}");
                         println!("------------");
                         None
                     },
-                    |inner| Some(inner),
+                    Some,
                 );
                 if let Some((puzzle, solution)) = res {
                     perfs[i].tries.push((*word, solution));
