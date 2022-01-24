@@ -11,7 +11,7 @@ Have you ever gotten so obsessed with [Wordle](https://www.powerlanguage.co.uk/w
 This crate is a part of the `wordle_rs` project, which has three parts:
 - [`wordle_rs`](https://crates.io/crates/wordle_rs), a library with tools you can use to write and evaluate your own Wordle strategies,
 - [`wordle_strategies`](https://crates.io/crates/wordle_strategies), a library demonstrating a few strategies that I wrote, and
-- `wordle_runner`, a binary that can run and compare Wordle strategies written with `wordle_rs`.
+- `wordle_runner` (WIP), a binary that can run and compare Wordle strategies written with `wordle_rs`.
 
 Please feel free to contribute your own strategies to `wordle_strategies`!
 
