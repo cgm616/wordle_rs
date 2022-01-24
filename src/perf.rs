@@ -126,10 +126,7 @@ impl Perf {
             .map(|(_, attempts)| attempts.inner().len())
             .for_each(|n| histogram[n - 1] += 1);
 
-        assert_eq!(
-            histogram.iter().sum::<u32>(),
-            self.cumulative_guesses_solved()
-        );
+        assert_eq!(histogram.iter().sum::<u32>(), self.num_solved());
 
         PerfSummary {
             strategy_name: &self.strategy_name,
