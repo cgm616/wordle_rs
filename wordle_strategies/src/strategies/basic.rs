@@ -52,8 +52,8 @@ impl Strategy for Basic {
                         .find(|(_, s)| {
                             let mut works = true;
 
-                            for (d, _) in info.almost.iter() {
-                                if !s.contains(*d) {
+                            for (d, (_, count)) in info.almost.iter() {
+                                if s.chars().filter(|c| d == c).count() < *count as usize {
                                     works = false;
                                     break;
                                 }
@@ -67,7 +67,9 @@ impl Strategy for Basic {
                 .unwrap()
             };
 
-            let (grades, got_it) = puzzle.check(&guess, &mut attempts).unwrap();
+            let (grades, got_it) = puzzle.check(&guess, &mut attempts).expect(&format!(
+                "for some reason, made incorrect hardmode guess!\nInformation: {info:?}\nattempts:\n{attempts}\n{guess} <-- bad guess here\n",
+            ));
             if got_it {
                 break;
             }
@@ -78,7 +80,7 @@ impl Strategy for Basic {
     }
 
     fn version(&self) -> &'static str {
-        "0.1.1"
+        "0.1.2"
     }
 
     fn hardmode(&self) -> bool {

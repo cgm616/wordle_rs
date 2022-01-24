@@ -67,7 +67,7 @@ impl Strategy for Common {
     }
 
     fn version(&self) -> &'static str {
-        "0.1.1"
+        "0.1.2"
     }
 
     fn hardmode(&self) -> bool {

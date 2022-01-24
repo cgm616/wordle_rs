@@ -15,7 +15,7 @@ use crate::util::occurrences;
 pub struct CommonEasy;
 
 impl Strategy for CommonEasy {
-    fn solve(&self, puzzle: &mut Puzzle, _key: AttemptsKey) -> Attempts {
+    fn solve(&self, _puzzle: &mut Puzzle, _key: AttemptsKey) -> Attempts {
         lazy_static! {
             static ref SORTED: Vec<&'static str> = {
                 let mut words = Vec::from(wordle_rs::words::GUESSES);
@@ -33,7 +33,8 @@ impl Strategy for CommonEasy {
         //let mut info = Information::new();
 
         // attempts
-        todo!("{:?}", puzzle)
+        // todo!("{:?}", puzzle)
+        todo!()
     }
 
     fn version(&self) -> &'static str {
