@@ -1,2 +1,6 @@
-pre-release-replacements = []
+pre-release-replacements = [
+  {file="README.md", search="wordle_rs = *", replace="wordle_rs = \"{{version}}\""},
+  {file="README.md", search="wordle_strategies = *", replace="{{crate_name}} = \"{{version}}\""},
+]
 tag = false
+shared-version = true
