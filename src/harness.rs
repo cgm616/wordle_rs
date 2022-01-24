@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use indicatif::ParallelProgressIterator;
+use indicatif::{ParallelProgressIterator, ProgressIterator};
 use rand::seq::index::sample;
 use rayon::prelude::*;
 
@@ -107,6 +107,62 @@ impl Harness {
             num_guesses: Some(n.clamp(0, ANSWERS.len())),
             ..self
         }
+    }
+
+    pub fn debug_run(&self, words: Option<&[Word]>) -> Result<Vec<Perf>, WordleError> {
+        use std::panic::{self, AssertUnwindSafe};
+
+        let mut perfs = Vec::new();
+        for strat in &self.strategies {
+            perfs.push(Perf::new(strat.as_ref()))
+        }
+
+        let words = match words {
+            Some(w) => Vec::from(w),
+            None => ANSWERS
+                .iter()
+                .map(|&i| Word::from_index(i))
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap(),
+        };
+
+        for word in words.iter() {
+            for (i, strategy) in self.strategies.iter().enumerate() {
+                let key = AttemptsKey::new(strategy.hardmode());
+                let res = {
+                    let wrapper = AssertUnwindSafe(strategy);
+                    panic::catch_unwind(|| {
+                        let mut puzzle = Puzzle::new(*word);
+                        let attempts = (*wrapper).solve(&mut puzzle, key);
+                        (puzzle, attempts)
+                    })
+                }
+                .map_or_else(
+                    |e| {
+                        println!("strategy {strategy} panicked on puzzle {word}");
+                        println!("------------");
+                        None
+                    },
+                    |inner| Some(inner),
+                );
+                if let Some((puzzle, solution)) = res {
+                    perfs[i].tries.push((*word, solution));
+
+                    if puzzle.poisoned {
+                        return Err(WordleError::StrategyCheated(format!("{}", strategy)));
+                    }
+                }
+            }
+        }
+
+        Ok(perfs)
+
+        // words
+        //     .iter()
+        //     .progress()
+        //     .map(|w| )
+        //     .collect::<Result<(), WordleError>>()
+        //     .map(|_| Arc::try_unwrap(perfs).unwrap().into_inner().unwrap())
     }
 
     /// Runs the harness and produces performances for each strategy.
