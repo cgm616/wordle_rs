@@ -11,7 +11,7 @@ pub mod harness;
 pub use harness::Harness;
 
 pub mod perf;
-pub use perf::{Perf, PerfSummary};
+pub use perf::{Perf, Summary};
 
 /// The errors that `wordle_rs` can produce.
 #[derive(Debug, Error)]

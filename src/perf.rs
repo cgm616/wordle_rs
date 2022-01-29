@@ -3,6 +3,7 @@
 use std::{fmt::Display, io::Write, ops::Deref};
 
 use comfy_table::{Cell, Color, ColumnConstraint, Row, Table, Width};
+use owo_colors::OwoColorize;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -14,7 +15,7 @@ use crate::{
 /// [test harness](crate::Harness).
 ///
 /// This struct can provide statistics about the attempts on its own, but it
-/// is recommended to produce [`PerfSummary`] first to cache the computations.
+/// is recommended to produce [`Summary`] first to cache the computations.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Perf {
     pub(crate) tries: Vec<(Word, Attempts)>,
@@ -120,7 +121,7 @@ impl Perf {
     }
 
     /// Converts this performance record to a pre-calculated summary.
-    pub fn to_summary(&self) -> PerfSummary {
+    pub fn to_summary(&self) -> Summary {
         let mut bins = [0; 6];
 
         self.tries
@@ -131,7 +132,7 @@ impl Perf {
 
         assert_eq!(bins.iter().sum::<u32>(), self.num_solved());
 
-        PerfSummary {
+        Summary {
             strategy_name: &self.strategy_name,
             num_tried: self.num_tried(),
             num_solved: self.num_solved(),
@@ -155,7 +156,7 @@ impl Display for Perf {
 /// [`Perf::to_summary()`] method when you want to use the performance to run
 /// statistics.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct PerfSummary<'a> {
+pub struct Summary<'a> {
     strategy_name: &'a str,
     num_tried: u32,
     num_solved: u32,
@@ -163,7 +164,7 @@ pub struct PerfSummary<'a> {
     histogram: Histogram,
 }
 
-impl<'a> PerfSummary<'a> {
+impl<'a> Summary<'a> {
     /// Gets the name of the strategy that produced this performance record.
     pub fn strategy_name(&self) -> &'a str {
         self.strategy_name
@@ -205,7 +206,7 @@ impl<'a> PerfSummary<'a> {
     ///
     /// This function does not include guesses made on puzzles that the
     /// strategy was unable to solve.
-    pub fn guesses_per_solution(&self) -> f32 {
+    pub fn mean_guesses(&self) -> f32 {
         (self.cumulative_guesses_solved() as f32) / (self.num_solved as f32)
     }
 
@@ -220,14 +221,93 @@ impl<'a> PerfSummary<'a> {
     pub fn frac_missed(&self) -> f32 {
         (self.num_missed() as f32) / (self.num_tried as f32)
     }
+
+    pub fn compare<'b>(&self, baseline: &Summary<'b>) -> Result<Comparison<'a, 'b>, WordleError> {
+        if self == baseline {
+            return Err(WordleError::SelfComparison);
+        }
+
+        Ok(Comparison::compare(self.clone(), baseline.clone()))
+    }
+
+    pub fn print(&self, options: SummaryPrintOptions) -> Result<(), WordleError> {
+        let mut stdout = std::io::stdout();
+        match options.compare {
+            Some(baseline) => {
+                let comparison = self.compare(&baseline)?;
+
+                writeln!(stdout, "{:-^80}", self.strategy_name)?;
+                writeln!(
+                    stdout,
+                    "Ran on {} words and comparing with {} on {} words",
+                    self.num_tried(),
+                    baseline.strategy_name(),
+                    baseline.num_tried()
+                )?;
+                writeln!(
+                    stdout,
+                    "Guessed {} correctly, or {:.1}% ({:.1}%)",
+                    self.num_solved(),
+                    self.frac_solved() * 100.,
+                    comparison.frac_solved_diff()
+                )?;
+                writeln!(
+                    stdout,
+                    "Guessed {} incorrectly, or {:.1}% ({:.1}%)",
+                    self.num_missed(),
+                    self.frac_missed() * 100.,
+                    comparison.frac_missed_diff()
+                )?;
+                writeln!(
+                    stdout,
+                    "Correct guesses took {:.2} ({:.2}) attempts on average",
+                    self.mean_guesses(),
+                    comparison.mean_guesses_diff()
+                )?;
+            }
+            None => {
+                write!(stdout, "{}", self)?;
+                write!(stdout, "{}", self.histogram)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn print_options() -> SummaryPrintOptions<'a> {
+        SummaryPrintOptions::default()
+    }
 }
 
-impl<'a> Display for PerfSummary<'a> {
+#[derive(Debug, Default, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SummaryPrintOptions<'a> {
+    compare: Option<Summary<'a>>,
+    histogram: bool,
+}
+
+impl<'a> SummaryPrintOptions<'a> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn compare(self, baseline: Summary<'a>) -> Self {
+        Self {
+            compare: Some(baseline),
+            ..self
+        }
+    }
+
+    pub fn histogram(self, histogram: bool) -> Self {
+        Self { histogram, ..self }
+    }
+}
+
+impl<'a> Display for Summary<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{:-^80}", self.strategy_name)?;
         writeln!(
             f,
-            "Guessed {} ({:.2}%) correctly, {} ({:.2}%) incorrectly out of {} words",
+            "Guessed {} ({:.1}%) correctly, {} ({:.1}%) incorrectly out of {} words",
             self.num_solved(),
             self.frac_solved() * 100.,
             self.num_missed(),
@@ -237,7 +317,7 @@ impl<'a> Display for PerfSummary<'a> {
         writeln!(
             f,
             "Correct guesses took {:.2} attempts on average",
-            self.guesses_per_solution()
+            self.mean_guesses()
         )?;
 
         Ok(())
