@@ -323,28 +323,41 @@ impl Deref for Histogram {
 
 impl Display for Histogram {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let max = self.iter().max().unwrap();
-        let digits = std::iter::successors(Some(*max), |&n| (n >= 10).then(|| n / 10)).count();
-        let count_per_mark = max / Self::MAX_BIN_PRINT_HEIGHT + 1;
+        // let max = self.iter().max().unwrap();
+        // let digits = std::iter::successors(Some(*max), |&n| (n >= 10).then(|| n / 10)).count();
+        // let count_per_mark = max / Self::MAX_BIN_PRINT_HEIGHT + 1;
 
-        for i in 0..Self::MAX_BIN_PRINT_HEIGHT {
-            let current = count_per_mark * (Self::MAX_BIN_PRINT_HEIGHT - i - 1);
-            if i % 4 == 0 {
-                write!(f, "{current:digits$} | ")?;
-            } else {
-                write!(f, "{:digits$} | ", "")?;
-            }
-            for bin in self.bins {
-                if bin > current {
-                    write!(f, "■ ")?;
-                } else {
-                    write!(f, "  ")?;
-                }
-            }
-            writeln!(f, "")?;
+        // for i in 0..Self::MAX_BIN_PRINT_HEIGHT {
+        //     let current = count_per_mark * (Self::MAX_BIN_PRINT_HEIGHT - i - 1);
+        //     if i % 4 == 0 {
+        //         write!(f, "{current:digits$} | ")?;
+        //     } else {
+        //         write!(f, "{:digits$} | ", "")?;
+        //     }
+        //     for bin in self.bins {
+        //         if bin > current {
+        //             write!(f, "■ ")?;
+        //         } else {
+        //             write!(f, "  ")?;
+        //         }
+        //     }
+        //     writeln!(f, "")?;
+        // }
+        // writeln!(f, "{:digits$} -------------", "")?;
+        // writeln!(f, "{:digits$}   1 2 3 4 5 6 ", "")?;
+
+        // Ok(())
+
+        let max = *self.iter().max().unwrap();
+        let digits =
+            std::iter::successors(Some(max), |&n| (n >= 10).then(|| n / 10)).count() as u32;
+        let count_per_mark = max as f32 / (80. - digits as f32 - 6.);
+
+        for (i, &bin) in self.bins.iter().enumerate() {
+            write!(f, "{} |", i + 1)?;
+            let marks = (bin as f32 / count_per_mark).floor() as usize;
+            writeln!(f, "{:■>marks$} ({})", "", bin)?;
         }
-        writeln!(f, "{:digits$} -------------", "")?;
-        writeln!(f, "{:digits$}   1 2 3 4 5 6 ", "")?;
 
         Ok(())
     }
