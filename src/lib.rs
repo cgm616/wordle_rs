@@ -14,7 +14,7 @@ pub mod perf;
 pub use perf::{Perf, PerfSummary};
 
 /// The errors that `wordle_rs` can produce.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Error)]
+#[derive(Debug, Error)]
 pub enum WordleError {
     /// The index provided when constructing a Wordle word does not correspond
     /// to a Wordle word.
@@ -39,4 +39,10 @@ pub enum WordleError {
     /// to gain more information about its puzzle.
     #[error("the strategy {0} cheated")]
     StrategyCheated(String),
+
+    #[error("could not print")]
+    Io(#[from] std::io::Error),
+
+    #[error("cannot compare a strategy with itself")]
+    SelfComparison,
 }

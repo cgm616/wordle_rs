@@ -1,11 +1,14 @@
 //! Evaluating and comparing strategies.
 
-use std::fmt::Display;
+use std::{fmt::Display, io::Write, ops::Deref};
 
 use comfy_table::{Cell, Color, ColumnConstraint, Row, Table, Width};
 use serde::{Deserialize, Serialize};
 
-use crate::strategy::{Attempts, Strategy, Word};
+use crate::{
+    strategy::{Attempts, Strategy, Word},
+    WordleError,
+};
 
 /// A record of one strategy's guesses after run by the
 /// [test harness](crate::Harness).
@@ -118,22 +121,22 @@ impl Perf {
 
     /// Converts this performance record to a pre-calculated summary.
     pub fn to_summary(&self) -> PerfSummary {
-        let mut histogram = [0; 6];
+        let mut bins = [0; 6];
 
         self.tries
             .iter()
             .filter(|(word, attempts)| attempts.solved(word))
             .map(|(_, attempts)| attempts.inner().len())
-            .for_each(|n| histogram[n - 1] += 1);
+            .for_each(|n| bins[n - 1] += 1);
 
-        assert_eq!(histogram.iter().sum::<u32>(), self.num_solved());
+        assert_eq!(bins.iter().sum::<u32>(), self.num_solved());
 
         PerfSummary {
             strategy_name: &self.strategy_name,
             num_tried: self.num_tried(),
             num_solved: self.num_solved(),
             cumulative_guesses: self.cumulative_guesses(),
-            histogram,
+            histogram: bins.into(),
         }
     }
 }
@@ -157,7 +160,7 @@ pub struct PerfSummary<'a> {
     num_tried: u32,
     num_solved: u32,
     cumulative_guesses: u32,
-    histogram: [u32; 6],
+    histogram: Histogram,
 }
 
 impl<'a> PerfSummary<'a> {
@@ -239,4 +242,114 @@ impl<'a> Display for PerfSummary<'a> {
 
         Ok(())
     }
+}
+
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
+pub struct Comparison<'a, 'b> {
+    this: Summary<'a>,
+    baseline: Summary<'b>,
+    solved_sig: f32,
+    guesses_sig: f32,
+}
+
+impl<'a, 'b> Comparison<'a, 'b> {
+    pub fn compare(this: Summary<'a>, baseline: Summary<'b>) -> Self {
+        Self {
+            this,
+            baseline,
+            ..todo!()
+        }
+    }
+
+    pub fn tries_eq(&self) -> bool {
+        self.this.num_tried == self.baseline.num_tried
+    }
+
+    pub fn num_tried(&self) -> Option<u32> {
+        if self.tries_eq() {
+            Some(self.this.num_solved() - self.baseline.num_solved())
+        } else {
+            None
+        }
+    }
+
+    pub fn num_solved_diff(&self) -> Option<u32> {
+        if self.tries_eq() {
+            Some(self.this.num_solved() - self.baseline.num_solved())
+        } else {
+            None
+        }
+    }
+
+    pub fn num_missed_diff(&self) -> Option<u32> {
+        if self.tries_eq() {
+            Some(self.this.num_missed() - self.baseline.num_missed())
+        } else {
+            None
+        }
+    }
+
+    pub fn frac_solved_diff(&self) -> f32 {
+        self.this.frac_solved() - self.baseline.frac_solved()
+    }
+
+    pub fn frac_missed_diff(&self) -> f32 {
+        self.this.frac_missed() - self.baseline.frac_missed()
+    }
+
+    pub fn mean_guesses_diff(&self) -> f32 {
+        self.this.mean_guesses() - self.baseline.mean_guesses()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct Histogram {
+    bins: [u32; 6],
+}
+
+impl From<[u32; 6]> for Histogram {
+    fn from(other: [u32; 6]) -> Self {
+        Self { bins: other }
+    }
+}
+
+impl Deref for Histogram {
+    type Target = [u32; 6];
+
+    fn deref(&self) -> &Self::Target {
+        &self.bins
+    }
+}
+
+impl Display for Histogram {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let max = self.iter().max().unwrap();
+        let digits = std::iter::successors(Some(*max), |&n| (n >= 10).then(|| n / 10)).count();
+        let count_per_mark = max / Self::MAX_BIN_PRINT_HEIGHT + 1;
+
+        for i in 0..Self::MAX_BIN_PRINT_HEIGHT {
+            let current = count_per_mark * (Self::MAX_BIN_PRINT_HEIGHT - i - 1);
+            if i % 4 == 0 {
+                write!(f, "{current:digits$} | ")?;
+            } else {
+                write!(f, "{:digits$} | ", "")?;
+            }
+            for bin in self.bins {
+                if bin > current {
+                    write!(f, "■ ")?;
+                } else {
+                    write!(f, "  ")?;
+                }
+            }
+            writeln!(f, "")?;
+        }
+        writeln!(f, "{:digits$} -------------", "")?;
+        writeln!(f, "{:digits$}   1 2 3 4 5 6 ", "")?;
+
+        Ok(())
+    }
+}
+
+impl Histogram {
+    const MAX_BIN_PRINT_HEIGHT: u32 = 20;
 }
