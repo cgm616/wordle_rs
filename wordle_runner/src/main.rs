@@ -1,4 +1,8 @@
-use wordle_rs::{harness::Harness, perf::Summary, strategy::Word};
+use wordle_rs::{
+    harness::Harness,
+    perf::Summary,
+    strategy::{stupid::Stupid, Word},
+};
 use wordle_strategies::{Basic, Common};
 
 fn main() {
@@ -8,30 +12,29 @@ fn main() {
         .add_strategy(Box::new(
             Basic::new().first_word(Word::from_str("pints").unwrap()),
         ))
-        // .add_strategy(Box::new(
-        //     Basic::new().first_word(Word::from_str("qajaq").unwrap()),
-        // ))
-        // .add_strategy(Box::new(
-        //     Basic::new().first_word(Word::from_str("pints").unwrap()),
-        // ))
-        .test_num(1500);
+        .add_strategy(Box::new(
+            Basic::new().first_word(Word::from_str("qajaq").unwrap()),
+        ))
+        .test_num(20);
     // .test_all();
     let perfs = harness.run().unwrap();
-    let common_perf = &perfs[0];
-    let pints_perf = &perfs[1];
 
-    let common_summary = common_perf.to_summary();
+    let basic_pints_perf = &perfs[2];
+    let basic_summary = basic_pints_perf.to_summary();
 
-    common_summary
-        .print(
+    for perf in &perfs {
+        let summary = perf.to_summary();
+        match summary.print(
             Summary::print_options()
-                .compare(pints_perf.to_summary())
+                .compare(&basic_summary)
                 .histogram(true),
-        )
-        .unwrap();
-
-    pints_perf
-        .to_summary()
-        .print(Summary::print_options().histogram(true))
-        .unwrap();
+        ) {
+            Ok(()) => {}
+            Err(e) => {
+                summary
+                    .print(Summary::print_options().histogram(true))
+                    .unwrap();
+            }
+        }
+    }
 }
