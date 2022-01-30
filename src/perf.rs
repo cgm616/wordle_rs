@@ -302,14 +302,29 @@ impl<'a> Summary<'a> {
                 } else {
                     writeln!(
                         stdout,
-                        "Correct guesses took {:.2} ({:.2}) attempts on average, not a sig. diff.",
+                        "Correct guesses took {:.2} ({:+.2}) attempts on average, not a sig. diff.",
                         self.mean_guesses(),
                         comparison.mean_guesses_diff(),
                     )?;
                 }
             }
             None => {
-                write!(stdout, "{}", self)?;
+                    writeln!(stdout, "{:-^80}", self.strategy_name)?;
+                writeln!(stdout, "Ran {} words", self.num_tried(),)?;
+
+                writeln!(
+                    stdout,
+                    "Guessed {} correctly, or {:.1}%, and {} incorrectly",
+                    self.num_solved(),
+                    self.frac_solved() * 100.,
+                    self.num_missed()
+                )?;
+
+                writeln!(
+                    stdout,
+                    "Correct guesses took {:.2} attempts on average",
+                    self.mean_guesses(),
+                )?;
             }
         }
 
@@ -336,9 +351,9 @@ impl<'a> SummaryPrintOptions<'a> {
         Self::default()
     }
 
-    pub fn compare(self, baseline: Summary<'a>) -> Self {
+    pub fn compare(self, baseline: &Summary<'a>) -> Self {
         Self {
-            compare: Some(baseline),
+            compare: Some(baseline.clone()),
             ..self
         }
     }
@@ -351,19 +366,20 @@ impl<'a> SummaryPrintOptions<'a> {
 impl<'a> Display for Summary<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{:-^80}", self.strategy_name)?;
+        writeln!(f, "Ran {} words", self.num_tried(),)?;
+
         writeln!(
             f,
-            "Guessed {} ({:.1}%) correctly, {} ({:.1}%) incorrectly out of {} words",
+            "Guessed {} correctly, or {:.1}%, and {} incorrectly",
             self.num_solved(),
             self.frac_solved() * 100.,
-            self.num_missed(),
-            self.frac_missed() * 100.,
-            self.num_tried()
+            self.num_missed()
         )?;
+
         writeln!(
             f,
             "Correct guesses took {:.2} attempts on average",
-            self.mean_guesses()
+            self.mean_guesses(),
         )?;
 
         Ok(())
