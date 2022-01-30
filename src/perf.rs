@@ -242,7 +242,7 @@ impl<'a> Summary<'a> {
                 writeln!(stdout, "{:-^80}", self.strategy_name)?;
                 writeln!(
                     stdout,
-                    "Ran {} words and comp. with {}, {} words",
+                    "Ran {} words against {} on {} words",
                     self.num_tried(),
                     baseline.strategy_name(),
                     baseline.num_tried()
@@ -309,7 +309,11 @@ impl<'a> Summary<'a> {
                 }
             }
             None => {
+                if options.baseline {
+                    writeln!(stdout, "Baseline: {:-^70}", self.strategy_name)?;
+                } else {
                     writeln!(stdout, "{:-^80}", self.strategy_name)?;
+                }
                 writeln!(stdout, "Ran {} words", self.num_tried(),)?;
 
                 writeln!(
@@ -344,6 +348,7 @@ impl<'a> Summary<'a> {
 pub struct SummaryPrintOptions<'a> {
     compare: Option<Summary<'a>>,
     histogram: bool,
+    baseline: bool,
 }
 
 impl<'a> SummaryPrintOptions<'a> {
@@ -360,6 +365,10 @@ impl<'a> SummaryPrintOptions<'a> {
 
     pub fn histogram(self, histogram: bool) -> Self {
         Self { histogram, ..self }
+    }
+
+    fn baseline(self, baseline: bool) -> Self {
+        Self { baseline, ..self }
     }
 }
 
