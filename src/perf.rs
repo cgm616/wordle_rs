@@ -1,9 +1,12 @@
 //! Evaluating and comparing strategies.
 
-use std::{fmt::Display, io::Write, ops::Deref};
+use std::{borrow::Borrow, fmt::Display, io::Write, ops::Deref};
 
 use comfy_table::{Cell, Color, ColumnConstraint, Row, Table, Width};
-use owo_colors::OwoColorize;
+use either::Either;
+use fishers_exact::FishersExactPvalues;
+use nanostat::Difference;
+use owo_colors::{AnsiColors, OwoColorize, Stream};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -227,7 +230,7 @@ impl<'a> Summary<'a> {
             return Err(WordleError::SelfComparison);
         }
 
-        Ok(Comparison::compare(self.clone(), baseline.clone()))
+        Ok(Comparison::compare(self.clone(), baseline.clone(), 95.))
     }
 
     pub fn print(&self, options: SummaryPrintOptions) -> Result<(), WordleError> {
@@ -239,36 +242,79 @@ impl<'a> Summary<'a> {
                 writeln!(stdout, "{:-^80}", self.strategy_name)?;
                 writeln!(
                     stdout,
-                    "Ran on {} words and comparing with {} on {} words",
+                    "Ran {} words and comp. with {}, {} words",
                     self.num_tried(),
                     baseline.strategy_name(),
                     baseline.num_tried()
                 )?;
-                writeln!(
+
+                let solved_sig = match comparison.solved {
+                    Either::Left(f) => f.two_tail_pvalue < 0.05,
+                    Either::Right(c) => todo!(),
+                };
+
+                if solved_sig {
+                    writeln!(
+                        stdout,
+                        "Guessed {} correctly, or {:.1}% ({:+.1}%), and {} incorrectly, {}",
+                        self.num_solved(),
+                        self.frac_solved() * 100.,
+                        (comparison.frac_solved_diff() * 100.).if_supports_color(
+                            Stream::Stdout,
+                            |text| {
+                                if comparison.frac_solved_diff().is_sign_positive() {
+                                    text.color(AnsiColors::Green)
+                                } else {
+                                    text.color(AnsiColors::Red)
+                                }
+                            }
+                        ),
+                        self.num_missed(),
+                        "a sig. diff.".if_supports_color(Stream::Stdout, |text| text.bold())
+                    )?;
+                } else {
+                    writeln!(
                     stdout,
-                    "Guessed {} correctly, or {:.1}% ({:.1}%)",
+                    "Guessed {} correctly, or {:.1}% ({:+.1}%), and {} incorrectly, not a sig. diff.",
                     self.num_solved(),
                     self.frac_solved() * 100.,
-                    comparison.frac_solved_diff()
+                    comparison.frac_solved_diff() * 100.,
+                    self.num_missed()
                 )?;
-                writeln!(
-                    stdout,
-                    "Guessed {} incorrectly, or {:.1}% ({:.1}%)",
-                    self.num_missed(),
-                    self.frac_missed() * 100.,
-                    comparison.frac_missed_diff()
-                )?;
-                writeln!(
-                    stdout,
-                    "Correct guesses took {:.2} ({:.2}) attempts on average",
-                    self.mean_guesses(),
-                    comparison.mean_guesses_diff()
-                )?;
+                }
+
+                if comparison.guesses.is_significant() {
+                    writeln!(
+                        stdout,
+                        "Correct guesses took {:.2} ({:.2}) attempts on average, {}",
+                        self.mean_guesses(),
+                        comparison
+                            .mean_guesses_diff()
+                            .if_supports_color(Stream::Stdout, |text| {
+                                if comparison.mean_guesses_diff().is_sign_negative() {
+                                    text.color(AnsiColors::Green)
+                                } else {
+                                    text.color(AnsiColors::Red)
+                                }
+                            }),
+                        "a sig. diff.".if_supports_color(Stream::Stdout, |text| text.bold())
+                    )?;
+                } else {
+                    writeln!(
+                        stdout,
+                        "Correct guesses took {:.2} ({:.2}) attempts on average, not a sig. diff.",
+                        self.mean_guesses(),
+                        comparison.mean_guesses_diff(),
+                    )?;
+                }
             }
             None => {
                 write!(stdout, "{}", self)?;
-                write!(stdout, "{}", self.histogram)?;
             }
+        }
+
+        if options.histogram {
+            write!(stdout, "{}", self.histogram)?;
         }
 
         Ok(())
@@ -324,20 +370,54 @@ impl<'a> Display for Summary<'a> {
     }
 }
 
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
+#[derive(Debug, Clone)]
 pub struct Comparison<'a, 'b> {
     this: Summary<'a>,
     baseline: Summary<'b>,
-    solved_sig: f32,
-    guesses_sig: f32,
+    solved: Either<FishersExactPvalues, ChiSquared>,
+    guesses: Difference,
 }
 
 impl<'a, 'b> Comparison<'a, 'b> {
-    pub fn compare(this: Summary<'a>, baseline: Summary<'b>) -> Self {
+    pub fn compare(this: Summary<'a>, baseline: Summary<'b>, confidence: f64) -> Self {
+        let this_stats_vec: Vec<_> = this
+            .histogram
+            .iter()
+            .enumerate()
+            .map(|(i, &v)| (i as f64 + 1.) * v as f64)
+            .collect();
+        let baseline_stats_vec: Vec<_> = baseline
+            .histogram
+            .iter()
+            .enumerate()
+            .map(|(i, &v)| (i as f64 + 1.) * v as f64)
+            .collect();
+        let this_stats: nanostat::Summary = this_stats_vec.iter().collect();
+        let baseline_stats: nanostat::Summary = baseline_stats_vec.iter().collect();
+
+        let guesses = this_stats.compare(&baseline_stats, confidence);
+
+        let solved = if this.num_tried().min(baseline.num_tried()) <= 10000 {
+            // Run fisher's
+            let res = fishers_exact::fishers_exact(&[
+                this.num_solved(),
+                baseline.num_solved(),
+                this.num_missed(),
+                baseline.num_missed(),
+            ])
+            .unwrap();
+            Either::Left(res)
+        } else {
+            // Run chi-squared
+
+            todo!()
+        };
+
         Self {
             this,
             baseline,
-            ..todo!()
+            solved,
+            guesses,
         }
     }
 
@@ -382,6 +462,17 @@ impl<'a, 'b> Comparison<'a, 'b> {
     }
 }
 
+#[derive(Clone, Debug)]
+struct ChiSquared {
+    pvalue: f64,
+}
+
+impl ChiSquared {
+    fn test() {
+        todo!()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Histogram {
     bins: [u32; 6],
@@ -403,35 +494,10 @@ impl Deref for Histogram {
 
 impl Display for Histogram {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // let max = self.iter().max().unwrap();
-        // let digits = std::iter::successors(Some(*max), |&n| (n >= 10).then(|| n / 10)).count();
-        // let count_per_mark = max / Self::MAX_BIN_PRINT_HEIGHT + 1;
-
-        // for i in 0..Self::MAX_BIN_PRINT_HEIGHT {
-        //     let current = count_per_mark * (Self::MAX_BIN_PRINT_HEIGHT - i - 1);
-        //     if i % 4 == 0 {
-        //         write!(f, "{current:digits$} | ")?;
-        //     } else {
-        //         write!(f, "{:digits$} | ", "")?;
-        //     }
-        //     for bin in self.bins {
-        //         if bin > current {
-        //             write!(f, "■ ")?;
-        //         } else {
-        //             write!(f, "  ")?;
-        //         }
-        //     }
-        //     writeln!(f, "")?;
-        // }
-        // writeln!(f, "{:digits$} -------------", "")?;
-        // writeln!(f, "{:digits$}   1 2 3 4 5 6 ", "")?;
-
-        // Ok(())
-
         let max = *self.iter().max().unwrap();
         let digits =
             std::iter::successors(Some(max), |&n| (n >= 10).then(|| n / 10)).count() as u32;
-        let count_per_mark = max as f32 / (80. - digits as f32 - 6.);
+        let count_per_mark = (max as f32 / (80. - digits as f32 - 6.)).max(1.0);
 
         for (i, &bin) in self.bins.iter().enumerate() {
             write!(f, "{} |", i + 1)?;
@@ -440,9 +506,7 @@ impl Display for Histogram {
         }
 
         Ok(())
-    }
-}
 
-impl Histogram {
-    const MAX_BIN_PRINT_HEIGHT: u32 = 20;
+        // TODO: test this to make sure it never outputs a line longer than 80 characters
+    }
 }
