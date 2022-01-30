@@ -1,7 +1,11 @@
 //! The test harness for running Wordle strategies.
 
-use std::sync::{Arc, Mutex};
+use std::{
+    ops::Deref,
+    sync::{Arc, Mutex},
+};
 
+use either::Either;
 use indicatif::ParallelProgressIterator;
 use rand::seq::index::sample;
 use rayon::prelude::*;
@@ -10,7 +14,7 @@ use crate::{
     perf::Perf,
     strategy::{AttemptsKey, Puzzle, Strategy, Word},
     words::ANSWERS,
-    WordleError,
+    Summary, WordleError,
 };
 
 /// A test harness that can run many strategies on many puzzles.
@@ -38,6 +42,7 @@ pub struct Harness {
     strategies: Vec<Box<dyn Strategy>>,
     verbose: bool,
     num_guesses: Option<usize>,
+    baseline: Option<usize>,
 }
 
 impl Default for Harness {
@@ -46,6 +51,7 @@ impl Default for Harness {
             strategies: Vec::new(),
             verbose: false,
             num_guesses: Some(100),
+            baseline: None,
         }
     }
 }
@@ -57,6 +63,7 @@ impl Harness {
     /// 1. tests no strategies
     /// 2. quiet mode
     /// 3. runs each strategy on 100 puzzles chosen at random
+    /// 4. does not compare against a baseline
     pub fn new() -> Self {
         Self::default()
     }
@@ -91,6 +98,20 @@ impl Harness {
         let mut strategies = self.strategies;
         strategies.extend(strats);
         Harness { strategies, ..self }
+    }
+
+    /// Adds a strategy to the harness for testing and sets it as the baseline
+    /// for comparison.
+    pub fn add_baseline(self, strat: Box<dyn Strategy>) -> Self {
+        self.add_strategy(strat).and_baseline()
+    }
+
+    /// Sets the mose recently added strategy as the baseline for comparisons.
+    pub fn and_baseline(self) -> Self {
+        Self {
+            baseline: Some(self.strategies.len() - 1),
+            ..self
+        }
     }
 
     /// Sets the harness to test each strategy on each possible Wordle answer.
@@ -169,7 +190,7 @@ impl Harness {
     ///
     /// The [`Perf`]s will be in the same order as the strategies were added
     /// to the harness.
-    pub fn run(&self) -> Result<Vec<Perf>, WordleError> {
+    pub fn run(&self) -> Result<Record, WordleError> {
         let perfs = Arc::new(Mutex::new(Vec::new()));
         {
             let mut perfs = perfs.lock().unwrap();
@@ -214,7 +235,10 @@ impl Harness {
             }
         }
 
-        Ok(Arc::try_unwrap(perfs).unwrap().into_inner().unwrap())
+        Ok(Record::new(
+            Arc::try_unwrap(perfs).unwrap().into_inner().unwrap(),
+            self.baseline,
+        ))
     }
 
     fn run_inner(&self, index: usize, perfs: Arc<Mutex<Vec<Perf>>>) -> Result<(), WordleError> {
@@ -238,11 +262,63 @@ impl Harness {
 
     /// Runs the harness (see [`run()`](Harness::run())) and prints performance
     /// summaries of each strategy.
-    pub fn run_and_summarize(&self) -> Result<Vec<Perf>, WordleError> {
+    pub fn run_and_summarize(&self) -> Result<Record, WordleError> {
         let perfs = self.run()?;
-        for perf in &perfs {
+        for perf in perfs.iter() {
             println!("{}", perf);
         }
         Ok(perfs)
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Record {
+    perfs: Vec<Perf>,
+    baseline: Option<usize>,
+}
+
+impl Deref for Record {
+    type Target = [Perf];
+
+    fn deref(&self) -> &Self::Target {
+        &self.perfs
+    }
+}
+
+impl Record {
+    fn new(perfs: Vec<Perf>, baseline: impl Into<Option<usize>>) -> Self {
+        Self {
+            perfs,
+            baseline: baseline.into(),
+        }
+    }
+
+    pub fn print_report(&self) -> Result<(), WordleError> {
+        if let Some(n) = self.baseline {
+            let baseline = &self.perfs[n];
+            let baseline_summary = baseline.to_summary();
+
+            for perf in self.perfs.iter() {
+                let summary = perf.to_summary();
+                match summary.print(
+                    Summary::print_options()
+                        .compare(&baseline_summary)
+                        .histogram(true),
+                ) {
+                    Ok(()) => {}
+                    Err(WordleError::SelfComparison) => summary
+                        .print(Summary::print_options().histogram(true))
+                        .unwrap(),
+                    Err(e) => return Err(e),
+                }
+            }
+        } else {
+            for perf in self.perfs.iter() {
+                let summary = perf.to_summary();
+                summary.print(Summary::print_options().histogram(true))?;
+            }
+        }
+
+        Ok(())
     }
 }
