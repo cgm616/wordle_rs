@@ -13,6 +13,8 @@ pub use harness::Harness;
 pub mod perf;
 pub use perf::{Perf, Summary};
 
+mod stats;
+
 /// The errors that `wordle_rs` can produce.
 #[derive(Debug, Error)]
 pub enum WordleError {
