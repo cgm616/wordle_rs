@@ -10,6 +10,7 @@ use owo_colors::{AnsiColors, OwoColorize, Stream};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    stats::{Tails, WelchsT},
     strategy::{Attempts, Strategy, Word},
     WordleError,
 };
@@ -37,6 +38,10 @@ impl Perf {
     /// Gets the name of the strategy that produced this performance record.
     pub fn strategy_name(&self) -> &str {
         &self.strategy_name
+    }
+
+    pub fn tries(&self) -> &[(Word, Attempts)] {
+        &self.tries
     }
 
     /// Gets the number of puzzles attempted by the strategy.
@@ -230,7 +235,7 @@ impl<'a> Summary<'a> {
             return Err(WordleError::SelfComparison);
         }
 
-        Ok(Comparison::compare(self.clone(), baseline.clone(), 95.))
+        Ok(Comparison::compare(self.clone(), baseline.clone(), 0.05))
     }
 
     pub fn print(&self, options: SummaryPrintOptions) -> Result<(), WordleError> {
@@ -307,6 +312,7 @@ impl<'a> Summary<'a> {
                         comparison.mean_guesses_diff(),
                     )?;
                 }
+                writeln!(stdout, "P-value: {}", comparison.guesses.p)?;
             }
             None => {
                 if options.baseline {
@@ -400,27 +406,43 @@ pub struct Comparison<'a, 'b> {
     this: Summary<'a>,
     baseline: Summary<'b>,
     solved: Either<FishersExactPvalues, ChiSquared>,
-    guesses: Difference,
+    guesses: WelchsT<f64>,
 }
 
 impl<'a, 'b> Comparison<'a, 'b> {
-    pub fn compare(this: Summary<'a>, baseline: Summary<'b>, confidence: f64) -> Self {
-        let this_stats_vec: Vec<_> = this
-            .histogram
-            .iter()
-            .enumerate()
-            .map(|(i, &v)| (i as f64 + 1.) * v as f64)
-            .collect();
-        let baseline_stats_vec: Vec<_> = baseline
-            .histogram
-            .iter()
-            .enumerate()
-            .map(|(i, &v)| (i as f64 + 1.) * v as f64)
-            .collect();
-        let this_stats: nanostat::Summary = this_stats_vec.iter().collect();
-        let baseline_stats: nanostat::Summary = baseline_stats_vec.iter().collect();
+    pub fn compare(this: Summary<'a>, baseline: Summary<'b>, alpha: f64) -> Self {
+        let guesses = WelchsT::two_sample(
+            this.histogram
+                .iter()
+                .enumerate()
+                .map(|(i, &v)| (i as f64 + 1.) * v as f64),
+            baseline
+                .histogram
+                .iter()
+                .enumerate()
+                .map(|(i, &v)| (i as f64 + 1.) * v as f64),
+            alpha,
+            Tails::Two,
+        );
 
-        let guesses = this_stats.compare(&baseline_stats, confidence);
+        // let this_stats_vec: Vec<_> = this
+        //     .histogram
+        //     .iter()
+        //     .enumerate()
+        //     .map(|(i, &v)| (i as f64 + 1.) * v as f64)
+        //     .map(|n| n.log10())
+        //     .collect();
+        // let baseline_stats_vec: Vec<_> = baseline
+        //     .histogram
+        //     .iter()
+        //     .enumerate()
+        //     .map(|(i, &v)| (i as f64 + 1.) * v as f64)
+        //     .map(|n| n.log10())
+        //     .collect();
+        // let this_stats: nanostat::Summary = this_stats_vec.iter().collect();
+        // let baseline_stats: nanostat::Summary = baseline_stats_vec.iter().collect();
+
+        // let guesses = this_stats.compare(&baseline_stats, confidence);
 
         let solved = if this.num_tried().min(baseline.num_tried()) <= 10000 {
             // Run fisher's

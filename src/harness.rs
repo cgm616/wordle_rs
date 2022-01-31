@@ -106,7 +106,7 @@ impl Harness {
         self.add_strategy(strat).and_baseline()
     }
 
-    /// Sets the mose recently added strategy as the baseline for comparisons.
+    /// Sets the most recently added strategy as the baseline for comparisons.
     pub fn and_baseline(self) -> Self {
         Self {
             baseline: Some(self.strategies.len() - 1),
