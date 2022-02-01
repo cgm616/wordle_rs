@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+use either::Either;
 use thiserror::Error;
 
 pub mod strategy;
@@ -42,9 +43,18 @@ pub enum WordleError {
     #[error("the strategy {0} cheated")]
     StrategyCheated(String),
 
-    #[error("could not print")]
+    #[error("general IO error")]
     Io(#[from] std::io::Error),
 
     #[error("cannot compare a strategy with itself")]
     SelfComparison,
+
+    #[error("test harness already has a baseline")]
+    BaselineAlreadySet,
+
+    #[error("cannot save baseline unless one is set to run")]
+    BaselineNotRun,
+
+    #[error("could not read or write baseline file")]
+    BaselineFile(#[source] Option<Either<std::io::Error, serde_json::Error>>),
 }

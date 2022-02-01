@@ -1,6 +1,14 @@
 //! Evaluating and comparing strategies.
 
-use std::{borrow::Borrow, fmt::Display, io::Write, ops::Deref};
+use std::{
+    borrow::{Borrow, Cow},
+    ffi::OsStr,
+    fmt::Display,
+    fs::File,
+    io::Write,
+    ops::Deref,
+    path::{Path, PathBuf},
+};
 
 use comfy_table::{Cell, Color, ColumnConstraint, Row, Table, Width};
 use either::Either;
@@ -10,6 +18,7 @@ use owo_colors::{AnsiColors, OwoColorize, Stream};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    harness::BaselineOpt,
     stats::{Tails, WelchsT},
     strategy::{Attempts, Strategy, Word},
     WordleError,
@@ -102,7 +111,7 @@ impl Perf {
     /// Prints the strategy's summary and then output a table showing the
     /// strategy's attempts for each puzzle.
     pub fn print(&self) {
-        print!("{}", self);
+        //print!("{}", self);
         let mut table = Table::new();
         if !table.is_tty() {
             table.set_table_width(80);
@@ -141,19 +150,12 @@ impl Perf {
         assert_eq!(bins.iter().sum::<u32>(), self.num_solved());
 
         Summary {
-            strategy_name: &self.strategy_name,
+            strategy_name: self.strategy_name.clone(),
             num_tried: self.num_tried(),
             num_solved: self.num_solved(),
             cumulative_guesses: self.cumulative_guesses(),
             histogram: bins.into(),
         }
-    }
-}
-
-impl Display for Perf {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let perf_summary = self.to_summary();
-        write!(f, "{}", perf_summary)
     }
 }
 
@@ -164,18 +166,18 @@ impl Display for Perf {
 /// [`Perf::to_summary()`] method when you want to use the performance to run
 /// statistics.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct Summary<'a> {
-    strategy_name: &'a str,
+pub struct Summary {
+    strategy_name: String,
     num_tried: u32,
     num_solved: u32,
     cumulative_guesses: u32,
     histogram: Histogram,
 }
 
-impl<'a> Summary<'a> {
+impl Summary {
     /// Gets the name of the strategy that produced this performance record.
-    pub fn strategy_name(&self) -> &'a str {
-        self.strategy_name
+    pub fn strategy_name(&self) -> &str {
+        &self.strategy_name
     }
 
     /// Gets the number of puzzles attempted by the strategy.
@@ -230,12 +232,15 @@ impl<'a> Summary<'a> {
         (self.num_missed() as f32) / (self.num_tried as f32)
     }
 
-    pub fn compare<'b>(&self, baseline: &Summary<'b>) -> Result<Comparison<'a, 'b>, WordleError> {
+    pub fn compare<'a, 'b>(
+        &'a self,
+        baseline: &'b Summary,
+    ) -> Result<Comparison<'a, 'b>, WordleError> {
         if self == baseline {
             return Err(WordleError::SelfComparison);
         }
 
-        Ok(Comparison::compare(self.clone(), baseline.clone(), 0.05))
+        Ok(Comparison::compare(self, baseline, 0.05))
     }
 
     pub fn print(&self, options: SummaryPrintOptions) -> Result<(), WordleError> {
@@ -315,8 +320,9 @@ impl<'a> Summary<'a> {
                 writeln!(stdout, "P-value: {}", comparison.guesses.p)?;
             }
             None => {
-                if options.baseline {
-                    writeln!(stdout, "Baseline: {:-^70}", self.strategy_name)?;
+                if let Some(s) = options.baseline {
+                    writeln!(stdout, "Baseline{:-^72}", self.strategy_name)?;
+                    writeln!(stdout, "{}", s)?;
                 } else {
                     writeln!(stdout, "{:-^80}", self.strategy_name)?;
                 }
@@ -345,24 +351,78 @@ impl<'a> Summary<'a> {
         Ok(())
     }
 
-    pub fn print_options() -> SummaryPrintOptions<'a> {
+    pub fn print_options() -> SummaryPrintOptions {
         SummaryPrintOptions::default()
+    }
+
+    pub fn from_saved(name: &str, dir: impl AsRef<Path>) -> Result<Summary, WordleError> {
+        let dir = dir.as_ref();
+
+        let path = dir
+            .read_dir()
+            .map_err(|e| WordleError::BaselineFile(Some(Either::Left(e))))?
+            .filter(Result::is_ok)
+            .map(Result::unwrap)
+            .find(|entry| {
+                let path = entry.path();
+                path.file_stem() == Some(OsStr::new(name))
+                    && path.extension() == Some(OsStr::new("json"))
+            })
+            .ok_or(WordleError::BaselineFile(None))?
+            .path();
+
+        let file = File::options()
+            .read(true)
+            .open(path)
+            .map_err(|e| WordleError::BaselineFile(Some(Either::Left(e))))?;
+
+        let summary = serde_json::from_reader(file)
+            .map_err(|e| WordleError::BaselineFile(Some(Either::Right(e))))?;
+
+        Ok(summary)
+    }
+
+    pub fn save(
+        &self,
+        name: &str,
+        dir: impl AsRef<Path>,
+        force: bool,
+    ) -> Result<PathBuf, WordleError> {
+        let dir = dir.as_ref();
+        std::fs::create_dir_all(dir)
+            .map_err(|e| WordleError::BaselineFile(Some(Either::Left(e))))?;
+
+        let mut path = dir.join(name);
+        path.set_extension("json");
+
+        let mut file = File::options()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .create_new(!force)
+            .open(&path)
+            .map_err(|e| WordleError::BaselineFile(Some(Either::Left(e))))?;
+
+        serde_json::to_writer(&mut file, self)
+            .map_err(|e| WordleError::BaselineFile(Some(Either::Right(e))))?;
+
+        Ok(path)
     }
 }
 
 #[derive(Debug, Default, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct SummaryPrintOptions<'a> {
-    compare: Option<Summary<'a>>,
+pub struct SummaryPrintOptions {
+    compare: Option<Summary>,
     histogram: bool,
-    baseline: bool,
+    baseline: Option<String>,
 }
 
-impl<'a> SummaryPrintOptions<'a> {
+impl<'a> SummaryPrintOptions {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn compare(self, baseline: &Summary<'a>) -> Self {
+    pub fn compare(self, baseline: &Summary) -> Self {
         Self {
             compare: Some(baseline.clone()),
             ..self
@@ -373,44 +433,30 @@ impl<'a> SummaryPrintOptions<'a> {
         Self { histogram, ..self }
     }
 
-    fn baseline(self, baseline: bool) -> Self {
+    pub(crate) fn baseline(self, baseline: &BaselineOpt) -> Self {
+        let baseline = match baseline {
+            BaselineOpt::None => None,
+            BaselineOpt::Run(_, Some(name)) => {
+                Some(format!("Used as baseline and saved as {}", name))
+            }
+            BaselineOpt::Run(_, None) => Some("Used as baseline and not saved".to_string()),
+            BaselineOpt::Saved(_, name) => Some(format!("Loaded baseline {} from disk", name)),
+        };
+
         Self { baseline, ..self }
-    }
-}
-
-impl<'a> Display for Summary<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{:-^80}", self.strategy_name)?;
-        writeln!(f, "Ran {} words", self.num_tried(),)?;
-
-        writeln!(
-            f,
-            "Guessed {} correctly, or {:.1}%, and {} incorrectly",
-            self.num_solved(),
-            self.frac_solved() * 100.,
-            self.num_missed()
-        )?;
-
-        writeln!(
-            f,
-            "Correct guesses took {:.2} attempts on average",
-            self.mean_guesses(),
-        )?;
-
-        Ok(())
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct Comparison<'a, 'b> {
-    this: Summary<'a>,
-    baseline: Summary<'b>,
+    this: &'a Summary,
+    baseline: &'b Summary,
     solved: Either<FishersExactPvalues, ChiSquared>,
     guesses: WelchsT<f64>,
 }
 
 impl<'a, 'b> Comparison<'a, 'b> {
-    pub fn compare(this: Summary<'a>, baseline: Summary<'b>, alpha: f64) -> Self {
+    pub fn compare(this: &'a Summary, baseline: &'b Summary, alpha: f64) -> Self {
         let guesses = WelchsT::two_sample(
             this.histogram
                 .iter()
