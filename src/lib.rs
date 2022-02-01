@@ -1,6 +1,5 @@
 #![doc = include_str!("../README.md")]
 
-use either::Either;
 use thiserror::Error;
 
 pub mod strategy;
@@ -19,6 +18,27 @@ mod stats;
 /// The errors that `wordle_rs` can produce.
 #[derive(Debug, Error)]
 pub enum WordleError {
+    #[error("puzzle encountered error")]
+    Puzzle {
+        #[from]
+        kind: PuzzleError,
+    },
+
+    #[error("general IO error")]
+    Printing(#[from] std::io::Error),
+
+    #[error("cannot compare a strategy with itself")]
+    SelfComparison,
+
+    #[error("the test harness encountered an error")]
+    Harness {
+        #[from]
+        kind: HarnessError,
+    },
+}
+
+#[derive(Debug, Error)]
+pub enum PuzzleError {
     /// The index provided when constructing a Wordle word does not correspond
     /// to a Wordle word.
     #[error("the index {0} does not correspond to a possible Wordle word")]
@@ -37,18 +57,10 @@ pub enum WordleError {
     /// does not follow Wordle hardmode rules.
     #[error("that guess does not follow hardmode rules")]
     InvalidHardmodeGuess,
+}
 
-    /// A strategy created an unauthorized instance of [`Attempts`] and used it
-    /// to gain more information about its puzzle.
-    #[error("the strategy {0} cheated")]
-    StrategyCheated(String),
-
-    #[error("general IO error")]
-    Io(#[from] std::io::Error),
-
-    #[error("cannot compare a strategy with itself")]
-    SelfComparison,
-
+#[derive(Debug, Error)]
+pub enum HarnessError {
     #[error("test harness already has a baseline")]
     BaselineAlreadySet,
 
@@ -56,8 +68,19 @@ pub enum WordleError {
     BaselineNotRun,
 
     #[error("could not read or write baseline file")]
-    BaselineFile(#[source] Option<Either<std::io::Error, serde_json::Error>>),
+    BaselineIo(#[from] std::io::Error),
+
+    #[error("a baseline file of that name does not exist")]
+    BaselineDoesntExist,
+
+    #[error("trouble serializing or deserializing baseline")]
+    Serde(#[from] serde_json::Error),
 
     #[error("no strategies have been added to the harness")]
     NoStrategiesAdded,
+
+    /// A strategy created an unauthorized instance of [`Attempts`] and used it
+    /// to gain more information about its puzzle.
+    #[error("the strategy {0} cheated")]
+    StrategyCheated(String),
 }

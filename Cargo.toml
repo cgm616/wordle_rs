@@ -23,7 +23,6 @@ either = "1.6.1"
 fishers_exact = "1.0.1"
 indicatif = {version = "0.16", features = ["rayon"]}
 itertools = "0.10.3"
-nanostat = "0.2.0"
 num-traits = "0.2.14"
 owo-colors = { version = "3.2.0", features = ["supports-colors"] }
 rand = "0.8"
@@ -36,16 +35,4 @@ thiserror = "1.0.30"
 [dev-dependencies]
 proptest = "1.0.0"
 pyo3 = { version = "0.15.1", features = ["auto-initialize"] }
-
-[target.x86_64-apple-darwin]
-rustflags = [
-  "-C", "link-arg=-undefined",
-  "-C", "link-arg=dynamic_lookup",
-]
-
-[target.aarch64-apple-darwin]
-rustflags = [
-  "-C", "link-arg=-undefined",
-  "-C", "link-arg=dynamic_lookup",
-]
 

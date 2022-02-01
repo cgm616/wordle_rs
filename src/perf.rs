@@ -1,7 +1,6 @@
 //! Evaluating and comparing strategies.
 
 use std::{
-    borrow::{Borrow, Cow},
     ffi::OsStr,
     fmt::Display,
     fs::File,
@@ -11,9 +10,7 @@ use std::{
 };
 
 use comfy_table::{Cell, Color, ColumnConstraint, Row, Table, Width};
-use either::Either;
 use fishers_exact::FishersExactPvalues;
-use nanostat::Difference;
 use owo_colors::{AnsiColors, OwoColorize, Stream};
 use serde::{Deserialize, Serialize};
 
@@ -21,7 +18,7 @@ use crate::{
     harness::BaselineOpt,
     stats::{Tails, WelchsT},
     strategy::{Attempts, Strategy, Word},
-    WordleError,
+    {HarnessError, WordleError},
 };
 
 /// A record of one strategy's guesses after run by the
@@ -258,10 +255,7 @@ impl Summary {
                     baseline.num_tried()
                 )?;
 
-                let solved_sig = match comparison.solved {
-                    Either::Left(f) => f.two_tail_pvalue < 0.05,
-                    Either::Right(c) => todo!(),
-                };
+                let solved_sig = comparison.solved.two_tail_pvalue < 0.05;
 
                 if solved_sig {
                     writeln!(
@@ -360,7 +354,7 @@ impl Summary {
 
         let path = dir
             .read_dir()
-            .map_err(|e| WordleError::BaselineFile(Some(Either::Left(e))))?
+            .map_err(HarnessError::BaselineIo)?
             .filter(Result::is_ok)
             .map(Result::unwrap)
             .find(|entry| {
@@ -368,16 +362,15 @@ impl Summary {
                 path.file_stem() == Some(OsStr::new(name))
                     && path.extension() == Some(OsStr::new("json"))
             })
-            .ok_or(WordleError::BaselineFile(None))?
+            .ok_or(HarnessError::BaselineDoesntExist)?
             .path();
 
         let file = File::options()
             .read(true)
             .open(path)
-            .map_err(|e| WordleError::BaselineFile(Some(Either::Left(e))))?;
+            .map_err(HarnessError::BaselineIo)?;
 
-        let summary = serde_json::from_reader(file)
-            .map_err(|e| WordleError::BaselineFile(Some(Either::Right(e))))?;
+        let summary = serde_json::from_reader(file).map_err(HarnessError::Serde)?;
 
         Ok(summary)
     }
@@ -389,8 +382,7 @@ impl Summary {
         force: bool,
     ) -> Result<PathBuf, WordleError> {
         let dir = dir.as_ref();
-        std::fs::create_dir_all(dir)
-            .map_err(|e| WordleError::BaselineFile(Some(Either::Left(e))))?;
+        std::fs::create_dir_all(dir).map_err(HarnessError::BaselineIo)?;
 
         let mut path = dir.join(name);
         path.set_extension("json");
@@ -401,10 +393,9 @@ impl Summary {
             .truncate(true)
             .create_new(!force)
             .open(&path)
-            .map_err(|e| WordleError::BaselineFile(Some(Either::Left(e))))?;
+            .map_err(HarnessError::BaselineIo)?;
 
-        serde_json::to_writer(&mut file, self)
-            .map_err(|e| WordleError::BaselineFile(Some(Either::Right(e))))?;
+        serde_json::to_writer(&mut file, self).map_err(HarnessError::Serde)?;
 
         Ok(path)
     }
@@ -451,7 +442,7 @@ impl<'a> SummaryPrintOptions {
 pub struct Comparison<'a, 'b> {
     this: &'a Summary,
     baseline: &'b Summary,
-    solved: Either<FishersExactPvalues, ChiSquared>,
+    solved: FishersExactPvalues,
     guesses: WelchsT<f64>,
 }
 
@@ -490,21 +481,13 @@ impl<'a, 'b> Comparison<'a, 'b> {
 
         // let guesses = this_stats.compare(&baseline_stats, confidence);
 
-        let solved = if this.num_tried().min(baseline.num_tried()) <= 10000 {
-            // Run fisher's
-            let res = fishers_exact::fishers_exact(&[
-                this.num_solved(),
-                baseline.num_solved(),
-                this.num_missed(),
-                baseline.num_missed(),
-            ])
-            .unwrap();
-            Either::Left(res)
-        } else {
-            // Run chi-squared
-
-            todo!()
-        };
+        let solved = fishers_exact::fishers_exact(&[
+            this.num_solved(),
+            baseline.num_solved(),
+            this.num_missed(),
+            baseline.num_missed(),
+        ])
+        .unwrap();
 
         Self {
             this,
@@ -552,17 +535,6 @@ impl<'a, 'b> Comparison<'a, 'b> {
 
     pub fn mean_guesses_diff(&self) -> f32 {
         self.this.mean_guesses() - self.baseline.mean_guesses()
-    }
-}
-
-#[derive(Clone, Debug)]
-struct ChiSquared {
-    pvalue: f64,
-}
-
-impl ChiSquared {
-    fn test() {
-        todo!()
     }
 }
 

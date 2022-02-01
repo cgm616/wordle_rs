@@ -1,8 +1,9 @@
-use std::{iter::Sum, ops::Deref};
+use std::iter::Sum;
 
 use num_traits::Float;
 use statrs::distribution::{ContinuousCDF, StudentsT};
 
+#[allow(dead_code)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Tails {
     One,
@@ -40,19 +41,15 @@ impl<N: Float + Sum> Sample<N> {
                 .into_iter()
                 .fold((0_u32, N::from(0_f32).unwrap()), |acc, next| {
                     let count = acc.0 + 1_u32;
-                    let sum = acc.1 + next.into();
+                    let sum = acc.1 + next;
 
                     (count, sum)
                 });
 
         let mean = sum / N::from(len).unwrap();
 
-        let var = sample
-            .clone()
-            .into_iter()
-            .map(|n| (n - mean).powi(2))
-            .sum::<N>()
-            / N::from(len - 1).unwrap();
+        let var =
+            sample.into_iter().map(|n| (n - mean).powi(2)).sum::<N>() / N::from(len - 1).unwrap();
 
         Sample {
             mean,
@@ -119,13 +116,8 @@ impl<N: Float + Sum + Into<f64>> WelchsT<N> {
     }
 }
 
-struct ChiSquared;
-
-struct FishersExact;
-
 #[cfg(test)]
 mod test {
-    use nanostat::{Difference, Summary};
     use proptest::prelude::*;
     use pyo3::{
         prelude::*,

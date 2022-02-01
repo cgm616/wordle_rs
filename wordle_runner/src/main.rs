@@ -1,9 +1,4 @@
-use wordle_rs::{
-    harness::Harness,
-    perf::Summary,
-    strategy::{stupid::Stupid, Word},
-    WordleError,
-};
+use wordle_rs::{harness::Harness, strategy::Word, WordleError};
 use wordle_strategies::{Basic, Common};
 
 fn main() -> Result<(), WordleError> {
