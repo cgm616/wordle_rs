@@ -57,4 +57,7 @@ pub enum WordleError {
 
     #[error("could not read or write baseline file")]
     BaselineFile(#[source] Option<Either<std::io::Error, serde_json::Error>>),
+
+    #[error("no strategies have been added to the harness")]
+    NoStrategiesAdded,
 }

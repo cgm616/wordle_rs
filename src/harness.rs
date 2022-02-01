@@ -41,7 +41,7 @@ use crate::{
 /// ```
 #[derive(Debug)]
 pub struct Harness {
-    strategies: Vec<Box<dyn Strategy>>,
+    strategies: Vec<(Box<dyn Strategy>, Option<String>)>,
     verbose: bool,
     num_guesses: Option<usize>,
     baseline: BaselineOpt,
@@ -89,14 +89,18 @@ impl Harness {
     }
 
     /// Adds a strategy to the harness for testing.
-    pub fn add_strategy(self, strat: Box<dyn Strategy>) -> Self {
+    pub fn add_strategy<'a>(
+        self,
+        strat: Box<dyn Strategy>,
+        save_name: impl Into<Option<&'a str>>,
+    ) -> Self {
         let mut strategies = self.strategies;
-        strategies.push(strat);
+        strategies.push((strat, save_name.into().map(|s| s.to_string())));
         Harness { strategies, ..self }
     }
 
     /// Adds a [`Vec`] of strategies to the harness for testing.
-    pub fn add_strategies(self, strats: Vec<Box<dyn Strategy>>) -> Self {
+    pub fn add_strategies(self, strats: Vec<(Box<dyn Strategy>, Option<String>)>) -> Self {
         let mut strategies = self.strategies;
         strategies.extend(strats);
         Harness { strategies, ..self }
@@ -104,35 +108,36 @@ impl Harness {
 
     /// Adds a strategy to the harness for testing and sets it as the baseline
     /// for comparison.
-    pub fn add_baseline(self, strat: Box<dyn Strategy>) -> Result<Self, WordleError> {
-        self.add_strategy(strat).and_baseline()
+    pub fn add_baseline<'a>(
+        self,
+        strat: Box<dyn Strategy>,
+        save_name: impl Into<Option<&'a str>>,
+    ) -> Result<Self, WordleError> {
+        self.add_strategy(strat, save_name).and_baseline()
     }
 
     /// Sets the most recently added strategy as the baseline for comparisons.
     pub fn and_baseline(self) -> Result<Self, WordleError> {
         match self.baseline {
             BaselineOpt::None => Ok(Self {
-                baseline: BaselineOpt::Run(self.strategies.len() - 1, None),
+                baseline: BaselineOpt::Run(
+                    self.strategies.len() - 1,
+                    self.strategies
+                        .last()
+                        .ok_or(WordleError::NoStrategiesAdded)?
+                        .1
+                        .clone(),
+                ),
                 ..self
             }),
             _ => Err(WordleError::BaselineAlreadySet),
         }
     }
 
-    pub fn save_baseline(self, name: &str) -> Result<Self, WordleError> {
-        match self.baseline {
-            BaselineOpt::Run(n, None) => Ok(Self {
-                baseline: BaselineOpt::Run(n, Some(name.to_string())),
-                ..self
-            }),
-            _ => Err(WordleError::BaselineNotRun),
-        }
-    }
-
     /// Adds a saved performance record as the baseline for comparisons.
     ///
     /// The `name` must match the name of a baseline saved previously.
-    pub fn add_saved_baseline<'a>(
+    pub fn load_baseline<'a>(
         self,
         name: &str,
         dir: impl Into<Option<&'a Path>>,
@@ -166,12 +171,22 @@ impl Harness {
         }
     }
 
+    fn pre_run_check(&self) -> Result<(), WordleError> {
+        if self.strategies.is_empty() {
+            return Err(WordleError::NoStrategiesAdded);
+        }
+
+        Ok(())
+    }
+
     pub fn debug_run(&self, words: Option<&[Word]>) -> Result<Vec<Perf>, WordleError> {
         use std::panic::{self, AssertUnwindSafe};
 
+        self.pre_run_check()?;
+
         let mut perfs = Vec::new();
         for strat in &self.strategies {
-            perfs.push(Perf::new(strat.as_ref()))
+            perfs.push(Perf::new(strat.0.as_ref()))
         }
 
         let words = match words {
@@ -184,7 +199,7 @@ impl Harness {
         };
 
         for word in words.iter() {
-            for (i, strategy) in self.strategies.iter().enumerate() {
+            for (i, (strategy, _)) in self.strategies.iter().enumerate() {
                 let key = AttemptsKey::new(strategy.hardmode());
                 let res = {
                     let wrapper = AssertUnwindSafe(strategy);
@@ -227,11 +242,13 @@ impl Harness {
     /// The [`Perf`]s will be in the same order as the strategies were added
     /// to the harness.
     pub fn run(&self) -> Result<Record, WordleError> {
+        self.pre_run_check()?;
+
         let perfs = Arc::new(Mutex::new(Vec::new()));
         {
             let mut perfs = perfs.lock().unwrap();
             for strat in &self.strategies {
-                perfs.push(Perf::new(strat.as_ref()))
+                perfs.push(Perf::new(strat.0.as_ref()))
             }
         }
 
@@ -287,14 +304,14 @@ impl Harness {
         let mut puzzle = Puzzle::new(word);
 
         for (i, strategy) in self.strategies.iter().enumerate() {
-            let key = AttemptsKey::new(strategy.hardmode());
-            let solution = strategy.solve(&mut puzzle, key);
+            let key = AttemptsKey::new(strategy.0.hardmode());
+            let solution = strategy.0.solve(&mut puzzle, key);
             {
                 let mut perfs = perfs.lock().unwrap();
                 perfs[i].tries.push((word, solution));
             }
             if puzzle.poisoned {
-                return Err(WordleError::StrategyCheated(format!("{}", strategy)));
+                return Err(WordleError::StrategyCheated(format!("{}", strategy.0)));
             }
         }
 
