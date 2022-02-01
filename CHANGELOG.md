@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - ReleaseDate
 
+### Added
+- A test harness can now accept a baseline against which it will compare the other running strategies using statistical methods
+- Saving and loading baselines from disk
+
 ### Changes
 - Fix typos in READMEs
 
