@@ -17,7 +17,7 @@ This crate is a part of the `wordle_rs` project, which has three parts:
 
 Please feel free to contribute your own strategies to `wordle_strategies`!
 
-## Using `wordle_rs` to write and evaluate a strategy
+## Using `wordle_rs` to write a strategy
 
 Add the following to your `Cargo.toml`:
 
@@ -38,24 +38,9 @@ impl Strategy for MyCoolStrategy {
 }
 ```
 
-Finally, configure and run the test harness on your strategy.
-
-```rust,ignore
-use wordle_rs::{harness::Harness};
-
-fn main() {
-    let harness = Harness::new()
-        .add_strategy(Box::new(MyCoolStrategy))
-        .test_all();
-    let perfs = harness.run_and_summarize();
-}
-```
-
-Or, use `wordle_runner` to run the strategy for you!
-
-## Using `wordle_runner`
-
-Forthcoming.
+Then, configure and run the test harness on your strategy.
+You can see how to do this below.
+You can also use `wordle_runner` to run your strategy for you, though this is still a work in progress.
 
 ## Running strategies from [`wordle_strategies`](https://crates.io/crates/wordle_strategies)
 
@@ -69,17 +54,30 @@ wordle_strategies = "0.1.2"
 
 Then, import a strategy and run the `wordle_rs` test harness on your strategy.
 
+## Running the `wordle_rs` test harness
+
+Simply import the harness and configure it to run the strategies that you want to test.
+You can add strategies from any location, including those that you write yourself.
+The `Harness::add_strategy` method accepts anything that implements the `Strategy` trait.
+
 ```rust,ignore
-use wordle_rs::{harness::Harness};
+use wordle_rs::{harness::Harness, WordleError};
 use wordle_strategies::Common;
 
-fn main() {
+fn main() -> Result<(), WordleError> {
     let harness = Harness::new()
-        .add_strategy(Box::new(Common))
+        .add_strategy(Box::new(Common), None)
         .test_num(10);
-    let perfs = harness.run_and_summarize();
+    let perfs = harness.run()?;
+    perfs.print_report()?;
+
+    Ok(())
 }
 ```
+
+## Using `wordle_runner`
+
+Forthcoming.
 
 ## License
 
