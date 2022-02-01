@@ -290,10 +290,12 @@ impl Harness {
 
         let perfs = Arc::try_unwrap(perfs).unwrap().into_inner().unwrap();
 
-        if let Some(name) = self.baseline.save_name() {
-            let summary = self.baseline.get_summary(&perfs).unwrap();
-            let dir = get_save_dir(None)?;
-            summary.save(name, &dir, false)?;
+        for ((_, name), perf) in self.strategies.iter().zip(perfs.iter()) {
+            if let Some(name) = name {
+                let summary = perf.to_summary();
+                let dir = get_save_dir(None)?;
+                summary.save(name, &dir, false)?;
+            }
         }
 
         Ok(Record::new(perfs, self.baseline.clone()))
