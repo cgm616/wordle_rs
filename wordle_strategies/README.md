@@ -30,14 +30,17 @@ wordle_strategies = "0.1.2"
 Then, import a strategy and run the `wordle_rs` test harness on your strategy.
 
 ```rust
-use wordle_rs::{harness::Harness};
+use wordle_rs::{harness::Harness, WordleError};
 use wordle_strategies::Common;
 
-fn main() {
+fn main() -> Result<(), WordleError> {
     let harness = Harness::new()
-        .add_strategy(Box::new(Common))
+        .add_strategy(Box::new(Common), None)
         .test_num(10);
-    let perfs = harness.run_and_summarize();
+    let perfs = harness.run()?;
+    perfs.print_report()?;
+
+    Ok(())
 }
 ```
 
