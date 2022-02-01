@@ -1,13 +1,11 @@
 //! The test harness for running Wordle strategies.
 
 use std::{
-    ffi::OsString,
     ops::Deref,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
-use either::Either;
 use indicatif::ParallelProgressIterator;
 use rand::seq::index::sample;
 use rayon::prelude::*;
@@ -16,7 +14,7 @@ use crate::{
     perf::Perf,
     strategy::{AttemptsKey, Puzzle, Strategy, Word},
     words::ANSWERS,
-    Summary, WordleError,
+    HarnessError, Summary, WordleError,
 };
 
 /// A test harness that can run many strategies on many puzzles.
@@ -34,7 +32,7 @@ use crate::{
 ///
 /// let harness = Harness::new()
 ///     .quiet()
-///     .add_strategy(Box::new(Stupid))
+///     .add_strategy(Box::new(Stupid), None)
 ///     .test_num(50);
 ///
 /// let results = harness.run();
@@ -124,13 +122,13 @@ impl Harness {
                     self.strategies.len() - 1,
                     self.strategies
                         .last()
-                        .ok_or(WordleError::NoStrategiesAdded)?
+                        .ok_or(HarnessError::NoStrategiesAdded)?
                         .1
                         .clone(),
                 ),
                 ..self
             }),
-            _ => Err(WordleError::BaselineAlreadySet),
+            _ => Err(HarnessError::BaselineAlreadySet.into()),
         }
     }
 
@@ -151,7 +149,7 @@ impl Harness {
                     ..self
                 })
             }
-            _ => Err(WordleError::BaselineAlreadySet),
+            _ => Err(HarnessError::BaselineAlreadySet.into()),
         }
     }
 
@@ -173,7 +171,7 @@ impl Harness {
 
     fn pre_run_check(&self) -> Result<(), WordleError> {
         if self.strategies.is_empty() {
-            return Err(WordleError::NoStrategiesAdded);
+            return Err(HarnessError::NoStrategiesAdded.into());
         }
 
         Ok(())
@@ -221,7 +219,7 @@ impl Harness {
                     perfs[i].tries.push((*word, solution));
 
                     if puzzle.poisoned {
-                        return Err(WordleError::StrategyCheated(format!("{}", strategy)));
+                        return Err(HarnessError::StrategyCheated(format!("{}", strategy)).into());
                     }
                 }
             }
@@ -313,21 +311,11 @@ impl Harness {
                 perfs[i].tries.push((word, solution));
             }
             if puzzle.poisoned {
-                return Err(WordleError::StrategyCheated(format!("{}", strategy.0)));
+                return Err(HarnessError::StrategyCheated(format!("{}", strategy.0)).into());
             }
         }
 
         Ok(())
-    }
-
-    /// Runs the harness (see [`run()`](Harness::run())) and prints performance
-    /// summaries of each strategy.
-    pub fn run_and_summarize(&self) -> Result<Record, WordleError> {
-        let perfs = self.run()?;
-        for perf in perfs.iter() {
-            //println!("{}", perf);
-        }
-        Ok(perfs)
     }
 }
 
@@ -344,20 +332,6 @@ impl BaselineOpt {
             Self::None => None,
             Self::Run(n, _) => Some(perfs[*n].to_summary()),
             Self::Saved(s, _) => Some(s.deref().clone()),
-        }
-    }
-
-    pub(crate) fn should_save(&self) -> bool {
-        match self {
-            Self::Run(_, Some(_)) => true,
-            _ => false,
-        }
-    }
-
-    pub(crate) fn save_name(&self) -> Option<&str> {
-        match self {
-            Self::Run(_, Some(s)) => Some(s),
-            _ => None,
         }
     }
 }
@@ -387,10 +361,7 @@ impl Default for Record {
 
 impl Record {
     fn new(perfs: Vec<Perf>, baseline: BaselineOpt) -> Self {
-        Self {
-            perfs,
-            baseline: baseline,
-        }
+        Self { perfs, baseline }
     }
 
     pub fn print_report(&self) -> Result<(), WordleError> {
@@ -444,11 +415,11 @@ fn get_save_dir<'a>(user: impl Into<Option<&'a Path>>) -> Result<PathBuf, Wordle
     let user: Option<&Path> = user.into();
     let var = std::env::var_os("WORDLE_BASELINE_DIR");
     let default = std::env::current_dir()
-        .map_err(|e| WordleError::BaselineFile(Some(Either::Left(e))))?
+        .map_err(HarnessError::BaselineIo)?
         .join("wordle_baseline");
 
     let dir = match &user {
-        Some(p) => p.as_ref(),
+        Some(p) => p,
         None => match &var {
             Some(s) => Path::new(s),
             None => default.as_path(),

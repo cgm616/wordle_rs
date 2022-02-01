@@ -8,7 +8,10 @@ use std::{
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::{words::GUESSES, WordleError};
+use crate::{
+    words::GUESSES,
+    {PuzzleError, WordleError},
+};
 
 pub mod stupid;
 
@@ -43,7 +46,7 @@ impl Word {
         if index < GUESSES.len() {
             Ok(Word { index })
         } else {
-            Err(WordleError::InvalidIndex(index))
+            Err(PuzzleError::InvalidIndex(index).into())
         }
     }
 
@@ -69,7 +72,7 @@ impl Word {
         GUESSES
             .binary_search(&word)
             .map(|index| Word { index })
-            .map_err(|_| WordleError::NotInWordlist(word.to_string()))
+            .map_err(|_| PuzzleError::NotInWordlist(word.to_string()).into())
     }
 }
 
@@ -206,7 +209,7 @@ impl Puzzle {
         }
 
         if attempts.push(*guess).is_err() {
-            return Err(WordleError::OutOfGuesses);
+            return Err(PuzzleError::OutOfGuesses.into());
         }
 
         Ok(self.check_inner(guess))
@@ -276,7 +279,7 @@ impl Puzzle {
                 Grade::Correct => {
                     // make sure prev == new since they know where this letter goes
                     if prev != new {
-                        return Err(WordleError::InvalidHardmodeGuess);
+                        return Err(PuzzleError::InvalidHardmodeGuess.into());
                     }
                 }
                 Grade::Incorrect => {}
@@ -286,7 +289,7 @@ impl Puzzle {
                     if guess.chars().filter(|&c| c == prev).count()
                         < almost_lookup[i(prev)] as usize
                     {
-                        return Err(WordleError::InvalidHardmodeGuess);
+                        return Err(PuzzleError::InvalidHardmodeGuess.into());
                     }
                 }
             }

@@ -404,15 +404,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nanostat"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95a316c1408142a5317d46af2438f681b2599408aa51314c4f739a320887f694"
-dependencies = [
- "statrs",
-]
-
-[[package]]
 name = "ntapi"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1052,7 +1043,6 @@ dependencies = [
  "fishers_exact",
  "indicatif",
  "itertools",
- "nanostat",
  "num-traits",
  "owo-colors",
  "proptest",
