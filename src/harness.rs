@@ -1,7 +1,9 @@
 //! The test harness for running Wordle strategies.
 
 use std::{
+    ffi::OsString,
     ops::Deref,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -42,7 +44,7 @@ pub struct Harness {
     strategies: Vec<Box<dyn Strategy>>,
     verbose: bool,
     num_guesses: Option<usize>,
-    baseline: Option<usize>,
+    baseline: BaselineOpt,
 }
 
 impl Default for Harness {
@@ -51,7 +53,7 @@ impl Default for Harness {
             strategies: Vec::new(),
             verbose: false,
             num_guesses: Some(100),
-            baseline: None,
+            baseline: BaselineOpt::None,
         }
     }
 }
@@ -102,15 +104,49 @@ impl Harness {
 
     /// Adds a strategy to the harness for testing and sets it as the baseline
     /// for comparison.
-    pub fn add_baseline(self, strat: Box<dyn Strategy>) -> Self {
+    pub fn add_baseline(self, strat: Box<dyn Strategy>) -> Result<Self, WordleError> {
         self.add_strategy(strat).and_baseline()
     }
 
     /// Sets the most recently added strategy as the baseline for comparisons.
-    pub fn and_baseline(self) -> Self {
-        Self {
-            baseline: Some(self.strategies.len() - 1),
-            ..self
+    pub fn and_baseline(self) -> Result<Self, WordleError> {
+        match self.baseline {
+            BaselineOpt::None => Ok(Self {
+                baseline: BaselineOpt::Run(self.strategies.len() - 1, None),
+                ..self
+            }),
+            _ => Err(WordleError::BaselineAlreadySet),
+        }
+    }
+
+    pub fn save_baseline(self, name: &str) -> Result<Self, WordleError> {
+        match self.baseline {
+            BaselineOpt::Run(n, None) => Ok(Self {
+                baseline: BaselineOpt::Run(n, Some(name.to_string())),
+                ..self
+            }),
+            _ => Err(WordleError::BaselineNotRun),
+        }
+    }
+
+    /// Adds a saved performance record as the baseline for comparisons.
+    ///
+    /// The `name` must match the name of a baseline saved previously.
+    pub fn add_saved_baseline<'a>(
+        self,
+        name: &str,
+        dir: impl Into<Option<&'a Path>>,
+    ) -> Result<Self, WordleError> {
+        match self.baseline {
+            BaselineOpt::None => {
+                let dir = get_save_dir(dir)?;
+                let baseline = Summary::from_saved(name, dir)?;
+                Ok(Self {
+                    baseline: BaselineOpt::Saved(Box::new(baseline), name.to_string()),
+                    ..self
+                })
+            }
+            _ => Err(WordleError::BaselineAlreadySet),
         }
     }
 
@@ -235,10 +271,15 @@ impl Harness {
             }
         }
 
-        Ok(Record::new(
-            Arc::try_unwrap(perfs).unwrap().into_inner().unwrap(),
-            self.baseline,
-        ))
+        let perfs = Arc::try_unwrap(perfs).unwrap().into_inner().unwrap();
+
+        if let Some(name) = self.baseline.save_name() {
+            let summary = self.baseline.get_summary(&perfs).unwrap();
+            let dir = get_save_dir(None)?;
+            summary.save(name, &dir, false)?;
+        }
+
+        Ok(Record::new(perfs, self.baseline.clone()))
     }
 
     fn run_inner(&self, index: usize, perfs: Arc<Mutex<Vec<Perf>>>) -> Result<(), WordleError> {
@@ -265,16 +306,47 @@ impl Harness {
     pub fn run_and_summarize(&self) -> Result<Record, WordleError> {
         let perfs = self.run()?;
         for perf in perfs.iter() {
-            println!("{}", perf);
+            //println!("{}", perf);
         }
         Ok(perfs)
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
+pub(crate) enum BaselineOpt {
+    None,
+    Run(usize, Option<String>),
+    Saved(Box<Summary>, String),
+}
+
+impl BaselineOpt {
+    pub(crate) fn get_summary(&self, perfs: &[Perf]) -> Option<Summary> {
+        match self {
+            Self::None => None,
+            Self::Run(n, _) => Some(perfs[*n].to_summary()),
+            Self::Saved(s, _) => Some(s.deref().clone()),
+        }
+    }
+
+    pub(crate) fn should_save(&self) -> bool {
+        match self {
+            Self::Run(_, Some(_)) => true,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn save_name(&self) -> Option<&str> {
+        match self {
+            Self::Run(_, Some(s)) => Some(s),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Record {
     perfs: Vec<Perf>,
-    baseline: Option<usize>,
+    baseline: BaselineOpt,
 }
 
 impl Deref for Record {
@@ -285,40 +357,84 @@ impl Deref for Record {
     }
 }
 
+impl Default for Record {
+    fn default() -> Self {
+        Self {
+            perfs: Vec::new(),
+            baseline: BaselineOpt::None,
+        }
+    }
+}
+
 impl Record {
-    fn new(perfs: Vec<Perf>, baseline: impl Into<Option<usize>>) -> Self {
+    fn new(perfs: Vec<Perf>, baseline: BaselineOpt) -> Self {
         Self {
             perfs,
-            baseline: baseline.into(),
+            baseline: baseline,
         }
     }
 
     pub fn print_report(&self) -> Result<(), WordleError> {
-        if let Some(n) = self.baseline {
-            let baseline = &self.perfs[n];
-            let baseline_summary = baseline.to_summary();
-
-            for perf in self.perfs.iter() {
-                let summary = perf.to_summary();
-                match summary.print(
-                    Summary::print_options()
-                        .compare(&baseline_summary)
-                        .histogram(true),
-                ) {
-                    Ok(()) => {}
-                    Err(WordleError::SelfComparison) => summary
-                        .print(Summary::print_options().histogram(true))
-                        .unwrap(),
-                    Err(e) => return Err(e),
+        match self.baseline.get_summary(&self.perfs) {
+            Some(baseline_summary) => {
+                let mut printed_baseline = false;
+                for perf in self.perfs.iter() {
+                    let summary = perf.to_summary();
+                    match summary.print(
+                        Summary::print_options()
+                            .compare(&baseline_summary)
+                            .histogram(true),
+                    ) {
+                        Ok(()) => {}
+                        Err(WordleError::SelfComparison) => {
+                            printed_baseline = true;
+                            summary
+                                .print(
+                                    Summary::print_options()
+                                        .histogram(true)
+                                        .baseline(&self.baseline),
+                                )
+                                .unwrap()
+                        }
+                        Err(e) => return Err(e),
+                    }
+                }
+                if !printed_baseline {
+                    baseline_summary
+                        .print(
+                            Summary::print_options()
+                                .histogram(true)
+                                .baseline(&self.baseline),
+                        )
+                        .unwrap()
                 }
             }
-        } else {
-            for perf in self.perfs.iter() {
-                let summary = perf.to_summary();
-                summary.print(Summary::print_options().histogram(true))?;
+            None => {
+                for perf in self.perfs.iter() {
+                    let summary = perf.to_summary();
+                    summary.print(Summary::print_options().histogram(true))?;
+                }
             }
         }
 
         Ok(())
     }
+}
+
+fn get_save_dir<'a>(user: impl Into<Option<&'a Path>>) -> Result<PathBuf, WordleError> {
+    let user: Option<&Path> = user.into();
+    let var = std::env::var_os("WORDLE_BASELINE_DIR");
+    let default = std::env::current_dir()
+        .map_err(|e| WordleError::BaselineFile(Some(Either::Left(e))))?
+        .join("wordle_baseline");
+
+    let dir = match &user {
+        Some(p) => p.as_ref(),
+        None => match &var {
+            Some(s) => Path::new(s),
+            None => default.as_path(),
+        },
+    };
+
+    Ok(dir.to_path_buf())
 }
