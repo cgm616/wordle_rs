@@ -15,7 +15,7 @@ fn main() -> Result<(), WordleError> {
         .load_baseline("basic_qajaq", None)?
         // .test_num(200);
         .test_all();
-    let perfs = harness.run().unwrap();
+    let perfs = harness.run()?;
 
     perfs.print_report()
 }

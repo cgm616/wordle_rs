@@ -6,6 +6,7 @@ use std::{
 };
 
 use itertools::Itertools;
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -19,7 +20,12 @@ pub mod stupid;
 ///
 /// This struct represents a possible Wordle guess, and its construction
 /// is validated to ensure that every instance is a possible word.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(crate = "serde_crate")
+)]
 pub struct Word {
     pub(crate) index: usize,
 }

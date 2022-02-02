@@ -9,17 +9,23 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(feature = "fancy")]
 use comfy_table::{Cell, Color, ColumnConstraint, Row, Table, Width};
+#[cfg(feature = "stats")]
 use fishers_exact::FishersExactPvalues;
+#[cfg(feature = "fancy")]
 use owo_colors::{AnsiColors, OwoColorize, Stream};
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::{
     harness::BaselineOpt,
-    stats::{Tails, WelchsT},
     strategy::{Attempts, Strategy, Word},
     {HarnessError, WordleError},
 };
+
+#[cfg(feature = "stats")]
+use crate::stats::{Tails, WelchsT};
 
 /// A record of one strategy's guesses after run by the
 /// [test harness](crate::Harness).
@@ -107,8 +113,8 @@ impl Perf {
 
     /// Prints the strategy's summary and then output a table showing the
     /// strategy's attempts for each puzzle.
+    #[cfg(feature = "fancy")]
     pub fn print(&self) {
-        //print!("{}", self);
         let mut table = Table::new();
         if !table.is_tty() {
             table.set_table_width(80);
@@ -162,7 +168,12 @@ impl Perf {
 /// It is recommended to convert the [`Perf`] struct to this via the
 /// [`Perf::to_summary()`] method when you want to use the performance to run
 /// statistics.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(crate = "serde_crate")
+)]
 pub struct Summary {
     strategy_name: String,
     num_tried: u32,
@@ -237,7 +248,12 @@ impl Summary {
             return Err(WordleError::SelfComparison);
         }
 
-        Ok(Comparison::compare(self, baseline, 0.05))
+        Ok(Comparison::compare(
+            self,
+            baseline,
+            #[cfg(feature = "stats")]
+            0.05,
+        ))
     }
 
     pub fn print(&self, options: SummaryPrintOptions) -> Result<(), WordleError> {
@@ -255,9 +271,9 @@ impl Summary {
                     baseline.num_tried()
                 )?;
 
-                let solved_sig = comparison.solved.two_tail_pvalue < 0.05;
-
-                if solved_sig {
+                #[cfg(feature = "stats")]
+                if comparison.solved.two_tail_pvalue < 0.05 {
+                    #[cfg(feature = "fancy")]
                     writeln!(
                         stdout,
                         "Guessed {} correctly, or {:.1}% ({:+.1}%), and {} incorrectly, {}",
@@ -271,23 +287,64 @@ impl Summary {
                                 } else {
                                     text.color(AnsiColors::Red)
                                 }
-                            }
+                            },
                         ),
                         self.num_missed(),
                         "a sig. diff.".if_supports_color(Stream::Stdout, |text| text.bold())
                     )?;
+
+                    #[cfg(not(feature = "fancy"))]
+                    writeln!(
+                        stdout,
+                        "Guessed {} correctly, or {:.1}% ({:+.1}%), and {} incorrectly, a sig. diff.",
+                        self.num_solved(),
+                        self.frac_solved() * 100.,
+                        comparison.frac_solved_diff() * 100.,
+                        self.num_missed(),
+                    )?;
                 } else {
                     writeln!(
-                    stdout,
-                    "Guessed {} correctly, or {:.1}% ({:+.1}%), and {} incorrectly, not a sig. diff.",
-                    self.num_solved(),
-                    self.frac_solved() * 100.,
-                    comparison.frac_solved_diff() * 100.,
-                    self.num_missed()
-                )?;
+                        stdout,
+                        "Guessed {} correctly, or {:.1}% ({:+.1}%), and {} incorrectly, not a sig. diff.",
+                        self.num_solved(),
+                        self.frac_solved() * 100.,
+                        comparison.frac_solved_diff() * 100.,
+                        self.num_missed()
+                    )?;
                 }
 
+                #[cfg(all(not(feature = "stats"), feature = "fancy"))]
+                writeln!(
+                    stdout,
+                    "Guessed {} correctly, or {:.1}% ({:+.1}%), and {} incorrectly",
+                    self.num_solved(),
+                    self.frac_solved() * 100.,
+                    (comparison.frac_solved_diff() * 100.).if_supports_color(
+                        Stream::Stdout,
+                        |text| {
+                            if comparison.frac_solved_diff().is_sign_positive() {
+                                text.color(AnsiColors::Green)
+                            } else {
+                                text.color(AnsiColors::Red)
+                            }
+                        },
+                    ),
+                    self.num_missed()
+                )?;
+
+                #[cfg(all(not(feature = "stats"), not(feature = "fancy")))]
+                writeln!(
+                    stdout,
+                    "Guessed {} correctly, or {:.1}% ({:+.1}%), and {} incorrectly",
+                    self.num_solved(),
+                    self.frac_solved() * 100.,
+                    (comparison.frac_solved_diff() * 100.),
+                    self.num_missed()
+                )?;
+
+                #[cfg(feature = "stats")]
                 if comparison.guesses.is_significant() {
+                    #[cfg(feature = "fancy")]
                     writeln!(
                         stdout,
                         "Correct guesses took {:.2} ({:.2}) attempts on average, {}",
@@ -303,6 +360,14 @@ impl Summary {
                             }),
                         "a sig. diff.".if_supports_color(Stream::Stdout, |text| text.bold())
                     )?;
+
+                    #[cfg(not(feature = "fancy"))]
+                    writeln!(
+                        stdout,
+                        "Correct guesses took {:.2} ({:.2}) attempts on average, a sig. diff.",
+                        self.mean_guesses(),
+                        comparison.mean_guesses_diff(),
+                    )?;
                 } else {
                     writeln!(
                         stdout,
@@ -311,6 +376,32 @@ impl Summary {
                         comparison.mean_guesses_diff(),
                     )?;
                 }
+
+                #[cfg(all(not(feature = "stats"), feature = "fancy"))]
+                writeln!(
+                    stdout,
+                    "Correct guesses took {:.2} ({:.2}) attempts on average",
+                    self.mean_guesses(),
+                    comparison
+                        .mean_guesses_diff()
+                        .if_supports_color(Stream::Stdout, |text| {
+                            if comparison.mean_guesses_diff().is_sign_negative() {
+                                text.color(AnsiColors::Green)
+                            } else {
+                                text.color(AnsiColors::Red)
+                            }
+                        }),
+                )?;
+
+                #[cfg(all(not(feature = "stats"), not(feature = "fancy")))]
+                writeln!(
+                    stdout,
+                    "Correct guesses took {:.2} ({:.2}) attempts on average",
+                    self.mean_guesses(),
+                    comparison.mean_guesses_diff(),
+                )?;
+
+                #[cfg(feature = "stats")]
                 writeln!(stdout, "P-value: {}", comparison.guesses.p)?;
             }
             None => {
@@ -349,6 +440,7 @@ impl Summary {
         SummaryPrintOptions::default()
     }
 
+    #[cfg(feature = "serde")]
     pub fn from_saved(name: &str, dir: impl AsRef<Path>) -> Result<Summary, WordleError> {
         let dir = dir.as_ref();
 
@@ -375,6 +467,7 @@ impl Summary {
         Ok(summary)
     }
 
+    #[cfg(feature = "serde")]
     pub fn save(
         &self,
         name: &str,
@@ -431,6 +524,7 @@ impl<'a> SummaryPrintOptions {
                 Some(format!("Used as baseline and saved as {}", name))
             }
             BaselineOpt::Run(_, None) => Some("Used as baseline and not saved".to_string()),
+            #[cfg(feature = "serde")]
             BaselineOpt::Saved(_, name) => Some(format!("Loaded baseline {} from disk", name)),
         };
 
@@ -442,12 +536,19 @@ impl<'a> SummaryPrintOptions {
 pub struct Comparison<'a, 'b> {
     this: &'a Summary,
     baseline: &'b Summary,
+    #[cfg(feature = "stats")]
     solved: FishersExactPvalues,
+    #[cfg(feature = "stats")]
     guesses: WelchsT<f64>,
 }
 
 impl<'a, 'b> Comparison<'a, 'b> {
-    pub fn compare(this: &'a Summary, baseline: &'b Summary, alpha: f64) -> Self {
+    pub fn compare(
+        this: &'a Summary,
+        baseline: &'b Summary,
+        #[cfg(feature = "stats")] alpha: f64,
+    ) -> Self {
+        #[cfg(feature = "stats")]
         let guesses = WelchsT::two_sample(
             this.histogram
                 .iter()
@@ -462,25 +563,7 @@ impl<'a, 'b> Comparison<'a, 'b> {
             Tails::Two,
         );
 
-        // let this_stats_vec: Vec<_> = this
-        //     .histogram
-        //     .iter()
-        //     .enumerate()
-        //     .map(|(i, &v)| (i as f64 + 1.) * v as f64)
-        //     .map(|n| n.log10())
-        //     .collect();
-        // let baseline_stats_vec: Vec<_> = baseline
-        //     .histogram
-        //     .iter()
-        //     .enumerate()
-        //     .map(|(i, &v)| (i as f64 + 1.) * v as f64)
-        //     .map(|n| n.log10())
-        //     .collect();
-        // let this_stats: nanostat::Summary = this_stats_vec.iter().collect();
-        // let baseline_stats: nanostat::Summary = baseline_stats_vec.iter().collect();
-
-        // let guesses = this_stats.compare(&baseline_stats, confidence);
-
+        #[cfg(feature = "stats")]
         let solved = fishers_exact::fishers_exact(&[
             this.num_solved(),
             baseline.num_solved(),
@@ -492,7 +575,9 @@ impl<'a, 'b> Comparison<'a, 'b> {
         Self {
             this,
             baseline,
+            #[cfg(feature = "stats")]
             solved,
+            #[cfg(feature = "stats")]
             guesses,
         }
     }
@@ -538,7 +623,12 @@ impl<'a, 'b> Comparison<'a, 'b> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(crate = "serde_crate")
+)]
 pub struct Histogram {
     bins: [u32; 6],
 }

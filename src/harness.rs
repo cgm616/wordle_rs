@@ -6,8 +6,12 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+#[cfg(all(feature = "fancy", feature = "parallel"))]
 use indicatif::ParallelProgressIterator;
+#[cfg(all(feature = "fancy", not(feature = "parallel")))]
+use indicatif::ProgressIterator;
 use rand::seq::index::sample;
+#[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
 use crate::{
@@ -135,6 +139,7 @@ impl Harness {
     /// Adds a saved performance record as the baseline for comparisons.
     ///
     /// The `name` must match the name of a baseline saved previously.
+    #[cfg(feature = "serde")]
     pub fn load_baseline<'a>(
         self,
         name: &str,
@@ -255,32 +260,89 @@ impl Harness {
         if let Some(n) = self.num_guesses {
             // try only some random words
 
+            #[cfg(all(feature = "parallel", not(feature = "fancy")))]
+            sample(&mut rng, ANSWERS.len(), n)
+                .iter()
+                .par_bridge()
+                .map(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+                .collect::<Result<(), WordleError>>()?;
+
+            #[cfg(all(not(feature = "parallel"), not(feature = "fancy")))]
+            sample(&mut rng, ANSWERS.len(), n)
+                .iter()
+                .map(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+                .collect::<Result<(), WordleError>>()?;
+
+            #[cfg(feature = "fancy")]
             if self.verbose {
+                #[cfg(feature = "parallel")]
                 sample(&mut rng, ANSWERS.len(), n)
                     .iter()
                     .par_bridge()
                     .progress_count(n as u64)
                     .map(|i| self.run_inner(ANSWERS[i], perfs.clone()))
                     .collect::<Result<(), WordleError>>()?;
+
+                #[cfg(not(feature = "parallel"))]
+                sample(&mut rng, ANSWERS.len(), n)
+                    .iter()
+                    .progress_count(n as u64)
+                    .map(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+                    .collect::<Result<(), WordleError>>()?;
             } else {
+                #[cfg(feature = "parallel")]
                 sample(&mut rng, ANSWERS.len(), n)
                     .iter()
                     .par_bridge()
+                    .map(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+                    .collect::<Result<(), WordleError>>()?;
+
+                #[cfg(not(feature = "parallel"))]
+                sample(&mut rng, ANSWERS.len(), n)
+                    .iter()
                     .map(|i| self.run_inner(ANSWERS[i], perfs.clone()))
                     .collect::<Result<(), WordleError>>()?;
             }
         } else {
             // try all words
 
+            #[cfg(feature = "parallel")]
+            (0..ANSWERS.len())
+                .into_par_iter()
+                .map(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+                .collect::<Result<(), WordleError>>()?;
+
+            #[cfg(not(feature = "parallel"))]
+            (0..ANSWERS.len())
+                .into_iter()
+                .map(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+                .collect::<Result<(), WordleError>>()?;
+
+            #[cfg(feature = "fancy")]
             if self.verbose {
+                #[cfg(feature = "parallel")]
                 (0..ANSWERS.len())
                     .into_par_iter()
                     .progress()
                     .map(|i| self.run_inner(ANSWERS[i], perfs.clone()))
                     .collect::<Result<(), WordleError>>()?;
+
+                #[cfg(not(feature = "parallel"))]
+                (0..ANSWERS.len())
+                    .into_iter()
+                    .progress()
+                    .map(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+                    .collect::<Result<(), WordleError>>()?;
             } else {
+                #[cfg(feature = "parallel")]
                 (0..ANSWERS.len())
                     .into_par_iter()
+                    .map(|i| self.run_inner(ANSWERS[i], perfs.clone()))
+                    .collect::<Result<(), WordleError>>()?;
+
+                #[cfg(not(feature = "parallel"))]
+                (0..ANSWERS.len())
+                    .into_iter()
                     .map(|i| self.run_inner(ANSWERS[i], perfs.clone()))
                     .collect::<Result<(), WordleError>>()?;
             }
@@ -288,6 +350,7 @@ impl Harness {
 
         let perfs = Arc::try_unwrap(perfs).unwrap().into_inner().unwrap();
 
+        #[cfg(feature = "serde")]
         for ((_, name), perf) in self.strategies.iter().zip(perfs.iter()) {
             if let Some(name) = name {
                 let summary = perf.to_summary();
@@ -323,6 +386,7 @@ impl Harness {
 pub(crate) enum BaselineOpt {
     None,
     Run(usize, Option<String>),
+    #[cfg(feature = "serde")]
     Saved(Box<Summary>, String),
 }
 
@@ -331,6 +395,7 @@ impl BaselineOpt {
         match self {
             Self::None => None,
             Self::Run(n, _) => Some(perfs[*n].to_summary()),
+            #[cfg(feature = "serde")]
             Self::Saved(s, _) => Some(s.deref().clone()),
         }
     }
@@ -411,6 +476,7 @@ impl Record {
     }
 }
 
+#[cfg(feature = "serde")]
 fn get_save_dir<'a>(user: impl Into<Option<&'a Path>>) -> Result<PathBuf, WordleError> {
     let user: Option<&Path> = user.into();
     let var = std::env::var_os("WORDLE_BASELINE_DIR");
