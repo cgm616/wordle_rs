@@ -1,4 +1,5 @@
 #![doc = include_str!("../README.md")]
+#![deny(missing_docs)]
 
 // Required to rename serde
 #[cfg(feature = "serde")]
