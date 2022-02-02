@@ -1,5 +1,9 @@
 #![doc = include_str!("../README.md")]
 
+// Required to rename serde
+#[cfg(feature = "serde")]
+extern crate serde_crate as serde;
+
 use thiserror::Error;
 
 pub mod strategy;
@@ -13,6 +17,7 @@ pub use harness::Harness;
 pub mod perf;
 pub use perf::{Perf, Summary};
 
+#[cfg(feature = "stats")]
 mod stats;
 
 /// The errors that `wordle_rs` can produce.
@@ -73,6 +78,7 @@ pub enum HarnessError {
     #[error("a baseline file of that name does not exist")]
     BaselineDoesntExist,
 
+    #[cfg(feature = "serde")]
     #[error("trouble serializing or deserializing baseline")]
     Serde(#[from] serde_json::Error),
 

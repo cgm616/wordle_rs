@@ -14,5 +14,5 @@ readme = "../README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-wordle_rs = {version = "0.1", path = "../"}
-wordle_strategies = {version = "0.1", path = "../wordle_strategies"}
+wordle_rs = { version = "0.1", path = "../" }
+wordle_strategies = { version = "0.1", path = "../wordle_strategies" }
