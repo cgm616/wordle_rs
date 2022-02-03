@@ -415,15 +415,6 @@ impl Deref for Record {
     }
 }
 
-impl Default for Record {
-    fn default() -> Self {
-        Self {
-            perfs: Vec::new(),
-            baseline: BaselineOpt::None,
-        }
-    }
-}
-
 impl Record {
     fn new(perfs: Vec<Perf>, baseline: BaselineOpt) -> Self {
         Self { perfs, baseline }

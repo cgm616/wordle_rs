@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     words::GUESSES,
-    {PuzzleError, WordleError},
+    {PuzzleError, Result, WordleError},
 };
 
 pub mod stupid;
@@ -48,7 +48,7 @@ impl Word {
     /// #
     /// # Ok::<_, wordle_rs::WordleError>(())
     /// ```
-    pub fn from_index(index: usize) -> Result<Self, WordleError> {
+    pub fn from_index(index: usize) -> Result<Self> {
         if index < GUESSES.len() {
             Ok(Word { index })
         } else {
@@ -74,7 +74,7 @@ impl Word {
     /// # Ok::<_, wordle_rs::WordleError>(())
     /// ```
     #[allow(clippy::should_implement_trait)]
-    pub fn from_str(word: &str) -> Result<Self, WordleError> {
+    pub fn from_str(word: &str) -> Result<Self> {
         GUESSES
             .binary_search(&word)
             .map(|index| Word { index })
@@ -198,11 +198,7 @@ impl Puzzle {
     /// #
     /// # Ok::<_, wordle_rs::WordleError>(())
     /// ```
-    pub fn check(
-        &mut self,
-        guess: &Word,
-        attempts: &mut Attempts,
-    ) -> Result<([Grade; 5], bool), WordleError> {
+    pub fn check(&mut self, guess: &Word, attempts: &mut Attempts) -> Result<([Grade; 5], bool)> {
         if attempts.cheat {
             self.poisoned = true;
         }
@@ -261,12 +257,7 @@ impl Puzzle {
         (res, correct)
     }
 
-    fn hardmode_guard(
-        &self,
-        previous: &Word,
-        grades: &[Grade],
-        guess: &Word,
-    ) -> Result<(), WordleError> {
+    fn hardmode_guard(&self, previous: &Word, grades: &[Grade], guess: &Word) -> Result<()> {
         // We need to check that `guess` incorporates all _revealed_ guesses.
         // That means that it uses the all of the almosts and correctly uses
         // all of the corrects.
@@ -407,12 +398,12 @@ impl Attempts {
     ///
     /// This will return an error if `inner` already has six elements.
     /// Otherwise, this function will succeed.
-    pub(crate) fn push(&mut self, word: Word) -> Result<usize, Word> {
+    pub(crate) fn push(&mut self, word: Word) -> Result<usize> {
         if self.inner.len() < 6 {
             self.inner.push(word);
             Ok(self.inner.len() - 1)
         } else {
-            Err(word)
+            Err(PuzzleError::OutOfGuesses.into())
         }
     }
 

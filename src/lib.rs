@@ -8,7 +8,7 @@ extern crate serde_crate as serde;
 use thiserror::Error;
 
 pub mod strategy;
-pub use strategy::Strategy;
+pub use strategy::{Attempts, AttemptsKey, Grade, Puzzle, Strategy, Word};
 
 pub mod words;
 
@@ -16,10 +16,12 @@ pub mod harness;
 pub use harness::Harness;
 
 pub mod perf;
-pub use perf::{Perf, Summary};
+pub use perf::{Perf, Summary, SummaryPrintOptions};
 
 #[cfg(feature = "stats")]
 mod stats;
+
+pub type Result<T> = std::result::Result<T, WordleError>;
 
 /// The errors that `wordle_rs` can produce.
 #[derive(Debug, Error)]
