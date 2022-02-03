@@ -165,6 +165,19 @@ pub const ANSWERS: [usize; 2315] = [
     12653, 12655, 12691, 12743, 12745, 12777, 12827, 12832, 12889, 12899, 12941,
 ];
 
+#[cfg(target_family = "wasm")]
+extern "C" {
+    pub static GUESSES_inner: [&'static str; 12972];
+}
+
+pub fn get_wordlist() -> [&'static str; 12972] {
+    #[cfg(target_family = "wasm")]
+    return unsafe { GUESSES_inner };
+
+    #[cfg(not(target_family = "wasm"))]
+    return GUESSES;
+}
+
 /// All possible guesses in a Wordle game.
 ///
 /// Wordle prevents you from guessing five-letter sequences that are not words,
@@ -175,7 +188,8 @@ pub const ANSWERS: [usize; 2315] = [
 /// In the Wordle source code, this list is disjoint from the list of possible answers. I
 /// have duplicated the elements of that list here to make guessing easier.
 /// The elements of the answer list are mixed in and this array is sorted.
-pub const GUESSES: [&str; 12972] = [
+#[cfg(not(target_family = "wasm"))]
+pub const GUESSES: [&'static str; 12972] = [
     "aahed", "aalii", "aargh", "aarti", "abaca", "abaci", "aback", "abacs", "abaft", "abaka",
     "abamp", "aband", "abase", "abash", "abask", "abate", "abaya", "abbas", "abbed", "abbes",
     "abbey", "abbot", "abcee", "abeam", "abear", "abele", "abers", "abets", "abhor", "abide",

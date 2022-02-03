@@ -16,6 +16,9 @@ use crate::{
 
 pub mod stupid;
 
+mod wrapper;
+pub(crate) use wrapper::Wrapper;
+
 /// A Wordle word.
 ///
 /// This struct represents a possible Wordle guess, and its construction

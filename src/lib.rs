@@ -6,7 +6,11 @@
 #[cfg(feature = "serde")]
 extern crate serde_crate as serde;
 
+<<<<<<< HEAD
 use std::error::Error as StdError;
+=======
+use std::error::Error as ErrorTrait;
+>>>>>>> ec7b78a (Add some basic sketch code)
 
 use thiserror::Error;
 
@@ -142,4 +146,7 @@ pub enum HarnessError {
     /// to gain more information about its puzzle.
     #[error("the strategy {0} cheated")]
     StrategyCheated(String),
+
+    #[error("could not load, compile, or instantiate wasm module:\n{0}")]
+    Wasm(#[source] Box<dyn ErrorTrait + Send>),
 }
