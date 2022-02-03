@@ -1,7 +1,6 @@
 //! Evaluating and comparing strategies.
 
 use std::{
-    ffi::OsStr,
     fmt::Display,
     fs::File,
     io::Write,
@@ -52,6 +51,7 @@ impl Perf {
         &self.strategy_name
     }
 
+    /// Gets the record of attempts made by the strategy and the corresponding words.
     pub fn tries(&self) -> &[(Word, Attempts)] {
         &self.tries
     }
@@ -179,7 +179,9 @@ pub struct Summary {
     num_tried: u32,
     num_solved: u32,
     cumulative_guesses: u32,
-    histogram: Histogram,
+
+    /// A histogram of the number of guesses used in each solved puzzle.
+    pub histogram: Histogram,
 }
 
 impl Summary {
@@ -240,6 +242,14 @@ impl Summary {
         (self.num_missed() as f32) / (self.num_tried as f32)
     }
 
+    /// Compares this summary against another provided in `baseline`.
+    ///
+    /// See [`Comparison`] to see what this function provides.
+    ///
+    /// When the `stats` build feature is enabled (see the feature description
+    /// in the [crate-level documentation](`crate#build-features`)) then this
+    /// function will perform hypothesis tests on the two summaries and return
+    /// the results in `Comparison`.
     pub fn compare<'a, 'b>(
         &'a self,
         baseline: &'b Summary,
@@ -256,7 +266,11 @@ impl Summary {
         ))
     }
 
-    pub fn print(&self, options: SummaryPrintOptions) -> Result<(), WordleError> {
+    /// Prints the [`Summary`] in a configurable way.
+    ///
+    /// To configure the print, use [`PrintOptions`]. You can create a new
+    /// [`PrintOptions`] with [`Summary::print_options()`].
+    pub fn print(&self, options: PrintOptions) -> Result<(), WordleError> {
         let mut stdout = std::io::stdout();
         match options.compare {
             Some(baseline) => {
@@ -436,37 +450,44 @@ impl Summary {
         Ok(())
     }
 
-    pub fn print_options() -> SummaryPrintOptions {
-        SummaryPrintOptions::default()
+    /// Creates a new [`PrintOptions`] with default configuration.
+    pub fn print_options() -> PrintOptions {
+        PrintOptions::default()
     }
 
+    /// Loads a summary from a previously-saved file.
+    ///
+    /// The `dir` parameter is where the summary was saved and `name` is
+    /// the name it was saved with (NOT the name of the strategy that produced
+    /// it.)
+    ///
+    /// To get the `dir` the same way that the test harness does, use
+    /// [`get_save_dir()`](crate::harness:get_save_dir).
     #[cfg(feature = "serde")]
     pub fn from_saved(name: &str, dir: impl AsRef<Path>) -> Result<Summary, WordleError> {
         let dir = dir.as_ref();
-
-        let path = dir
-            .read_dir()
-            .map_err(HarnessError::BaselineIo)?
-            .filter(Result::is_ok)
-            .map(Result::unwrap)
-            .find(|entry| {
-                let path = entry.path();
-                path.file_stem() == Some(OsStr::new(name))
-                    && path.extension() == Some(OsStr::new("json"))
-            })
-            .ok_or(HarnessError::BaselineDoesntExist)?
-            .path();
+        let mut path = dir.to_path_buf();
+        path.push(name);
+        path.set_extension("json");
 
         let file = File::options()
             .read(true)
             .open(path)
-            .map_err(HarnessError::BaselineIo)?;
+            .map_err(|e| HarnessError::BaselineRead(Box::new(e)))?;
 
-        let summary = serde_json::from_reader(file).map_err(HarnessError::Serde)?;
+        let summary =
+            serde_json::from_reader(file).map_err(|e| HarnessError::BaselineRead(Box::new(e)))?;
 
         Ok(summary)
     }
 
+    /// Saves the summary with a particular name and in a particular directory.
+    ///
+    /// When `force` is true, this will overwrite any "[name].json" file
+    /// in the passed directory.
+    ///
+    /// To get the `dir` the same way that the test harness does, use
+    /// [`get_save_dir()`](crate::harness:get_save_dir).
     #[cfg(feature = "serde")]
     pub fn save(
         &self,
@@ -475,7 +496,7 @@ impl Summary {
         force: bool,
     ) -> Result<PathBuf, WordleError> {
         let dir = dir.as_ref();
-        std::fs::create_dir_all(dir).map_err(HarnessError::BaselineIo)?;
+        std::fs::create_dir_all(dir).map_err(|e| HarnessError::SummaryWrite(Box::new(e)))?;
 
         let mut path = dir.join(name);
         path.set_extension("json");
@@ -486,26 +507,34 @@ impl Summary {
             .truncate(true)
             .create_new(!force)
             .open(&path)
-            .map_err(HarnessError::BaselineIo)?;
+            .map_err(|e| HarnessError::SummaryWrite(Box::new(e)))?;
 
-        serde_json::to_writer(&mut file, self).map_err(HarnessError::Serde)?;
+        serde_json::to_writer(&mut file, self)
+            .map_err(|e| HarnessError::SummaryWrite(Box::new(e)))?;
 
         Ok(path)
     }
 }
 
+/// Configurable options that control printing performance records.
 #[derive(Debug, Default, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct SummaryPrintOptions {
+pub struct PrintOptions {
     compare: Option<Summary>,
     histogram: bool,
     baseline: Option<String>,
 }
 
-impl<'a> SummaryPrintOptions {
+impl<'a> PrintOptions {
+    /// Creates a new instance with default configuration.
+    ///
+    /// Defaults:
+    /// - does not compare against other summary
+    /// - does not print histogram
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the summary to compare against while printing.
     pub fn compare(self, baseline: &Summary) -> Self {
         Self {
             compare: Some(baseline.clone()),
@@ -513,10 +542,14 @@ impl<'a> SummaryPrintOptions {
         }
     }
 
+    /// Sets whether or not to display the histogram.
+    ///
+    /// Passing `true` will display it and `false` will suppress it.
     pub fn histogram(self, histogram: bool) -> Self {
         Self { histogram, ..self }
     }
 
+    /// Sets the baseline text.
     pub(crate) fn baseline(self, baseline: &BaselineOpt) -> Self {
         let baseline = match baseline {
             BaselineOpt::None => None,
@@ -532,6 +565,11 @@ impl<'a> SummaryPrintOptions {
     }
 }
 
+/// A comparison between two [`Summary`]s.
+///
+/// When the `stats` build feature is enabled (see the feature description
+/// in the [crate-level documentation](`crate#build-features`)) then this
+/// struct will contain hypothesis tests on the two summaries.
 #[derive(Debug, Clone)]
 pub struct Comparison<'a, 'b> {
     this: &'a Summary,
@@ -543,6 +581,11 @@ pub struct Comparison<'a, 'b> {
 }
 
 impl<'a, 'b> Comparison<'a, 'b> {
+    /// Produces a new [`Comparison`] from two [`Summary`]s.
+    ///
+    /// All of the "difference" methods on the resulting [`Comparison`]
+    /// will return the equivalent of `this - baseline` in the corresponding
+    /// measure.
     pub fn compare(
         this: &'a Summary,
         baseline: &'b Summary,
@@ -582,10 +625,16 @@ impl<'a, 'b> Comparison<'a, 'b> {
         }
     }
 
+    /// Returns whether or not the two strategies that produced the summaries
+    /// ran on the same number of puzzles.
     pub fn tries_eq(&self) -> bool {
         self.this.num_tried == self.baseline.num_tried
     }
 
+    /// Returns the number of puzzles that the strategies ran on, if they
+    /// ran on the same number.
+    ///
+    /// If the strategies ran on a different number of puzzles, returns [`None`].
     pub fn num_tried(&self) -> Option<u32> {
         if self.tries_eq() {
             Some(self.this.num_solved() - self.baseline.num_solved())
@@ -594,6 +643,11 @@ impl<'a, 'b> Comparison<'a, 'b> {
         }
     }
 
+    /// Returns the difference between the number of puzzles solved by the
+    /// two strategies that produced the summaries, if they ran on the same
+    /// number of puzzles.
+    ///
+    /// Otherwise, this number is meaningless and the function will return [`None`].
     pub fn num_solved_diff(&self) -> Option<u32> {
         if self.tries_eq() {
             Some(self.this.num_solved() - self.baseline.num_solved())
@@ -602,6 +656,11 @@ impl<'a, 'b> Comparison<'a, 'b> {
         }
     }
 
+    /// Returns the difference between the number of puzzles missed by the
+    /// two strategies that produced the summaries, if they ran on the same
+    /// number of puzzles.
+    ///
+    /// Otherwise, this number is meaningless and the function will return [`None`].
     pub fn num_missed_diff(&self) -> Option<u32> {
         if self.tries_eq() {
             Some(self.this.num_missed() - self.baseline.num_missed())
@@ -610,19 +669,65 @@ impl<'a, 'b> Comparison<'a, 'b> {
         }
     }
 
+    /// Returns the difference between the fraction of puzzles solved by the
+    /// strategies that produced the two summaries.
+    ///
+    /// This function always works no matter the different between the number
+    /// of puzzles each strategy ran on.
     pub fn frac_solved_diff(&self) -> f32 {
         self.this.frac_solved() - self.baseline.frac_solved()
     }
 
+    /// Returns the difference between the fraction of puzzles missed by the
+    /// strategies that produced the two summaries.
+    ///
+    /// This function always works no matter the different between the number
+    /// of puzzles each strategy ran on.
     pub fn frac_missed_diff(&self) -> f32 {
         self.this.frac_missed() - self.baseline.frac_missed()
     }
 
+    /// Returns the difference between the number of guesses used by the strategies
+    /// in each puzzle they solved.
+    ///
+    /// This function always works no matter the different between the number
+    /// of puzzles each strategy ran on.
     pub fn mean_guesses_diff(&self) -> f32 {
         self.this.mean_guesses() - self.baseline.mean_guesses()
     }
 }
 
+/// A histogram of the number of guesses used by a strategy in each puzzle
+/// that it solved.
+///
+/// Indexing the histogram with `n` returns the number of puzzles that the
+/// strategy solved in `n + 1` guesses.
+///
+/// You can create a histogram from a six-element array of `u32`s, but the
+/// [`Perf::to_summary()`] method will create one for you. The resulting
+/// histogram is in the `histogram` field of the [`Summary`].
+///
+/// # Examples
+///
+/// For instance, suppose a strategy solved:
+/// - no puzzles in 1 guess,
+/// - 3 puzzles in 2 guesses,
+/// - 8 puzzles in 3 guesses,
+/// - 20 puzzles in 4 guesses,
+/// - 25 puzzles in 5 guesses, and
+/// - 18 puzzles in 6 guesses.
+///
+/// If `histogram` contains that record:
+/// ```
+/// # use wordle_rs::perf::Histogram;
+/// # let histogram: Histogram = [0, 3, 8, 20, 25, 18].into();
+/// assert_eq!(histogram[0], 0);
+/// assert_eq!(histogram[1], 3);
+/// assert_eq!(histogram[2], 8);
+/// assert_eq!(histogram[3], 20);
+/// assert_eq!(histogram[4], 25);
+/// assert_eq!(histogram[5], 18);
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(
     feature = "serde",

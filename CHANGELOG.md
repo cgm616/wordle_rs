@@ -9,7 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - ReleaseDate
 
 ### Added
-- A test harness can now accept a baseline against which it will compare the other running strategies using statistical methods
+- Documentation for entire public API
+- Crate features for enabling and disabling certain non-crucial capabilities (see docs for more info)
+- Comparison against baselines using stats
 - Saving and loading baselines from disk
 
 ### Changes

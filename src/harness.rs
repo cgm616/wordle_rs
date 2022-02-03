@@ -182,6 +182,11 @@ impl Harness {
         Ok(())
     }
 
+    /// Runs the test harness on a specific set of words without parallelism.
+    ///
+    /// This function will catch panics in strategies and print them as errors
+    /// along with the word the strategy was trying to solve, which
+    /// is useful for finding bugs in [`Strategy`](crate::Strategy) implementations.
     pub fn debug_run(&self, words: Option<&[Word]>) -> Result<Vec<Perf>, WordleError> {
         use std::panic::{self, AssertUnwindSafe};
 
@@ -401,6 +406,11 @@ impl BaselineOpt {
     }
 }
 
+/// A record produced by the test harness of a particular run.
+///
+/// This struct contains the performance records of each strategy and
+/// information about the baseline set. It can print the performances and
+/// dereferences to the performance records themselves.
 #[derive(Debug, Clone)]
 pub struct Record {
     perfs: Vec<Perf>,
@@ -416,10 +426,14 @@ impl Deref for Record {
 }
 
 impl Record {
+    /// Create a new [`Record`] from perfs and baseline configuration.
     fn new(perfs: Vec<Perf>, baseline: BaselineOpt) -> Self {
         Self { perfs, baseline }
     }
 
+    /// Prints a report detailing each strategy's performance.
+    ///
+    /// This will use the baseline configuration passed to the test harness.
     pub fn print_report(&self) -> Result<(), WordleError> {
         match self.baseline.get_summary(&self.perfs) {
             Some(baseline_summary) => {
@@ -467,12 +481,19 @@ impl Record {
     }
 }
 
+/// Gets the save directory given an optional path to use.
+///
+/// If a path is passed to this function, it will return that. Otherwise, it
+/// will return the value of the `WORDLE_BASELINE_DIR` environment variable.
+/// If that environment variable is not set, it will return the `wordle_baseline/`
+/// directory in the current working directory (the directory of the running
+/// process.)
 #[cfg(feature = "serde")]
-fn get_save_dir<'a>(user: impl Into<Option<&'a Path>>) -> Result<PathBuf, WordleError> {
+pub fn get_save_dir<'a>(user: impl Into<Option<&'a Path>>) -> Result<PathBuf, WordleError> {
     let user: Option<&Path> = user.into();
     let var = std::env::var_os("WORDLE_BASELINE_DIR");
     let default = std::env::current_dir()
-        .map_err(HarnessError::BaselineIo)?
+        .map_err(|e| HarnessError::SummaryWrite(Box::new(e)))?
         .join("wordle_baseline");
 
     let dir = match &user {

@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     words::GUESSES,
-    {PuzzleError, Result, WordleError},
+    {PuzzleError, Result},
 };
 
 pub mod stupid;
@@ -329,6 +329,13 @@ impl AttemptsKey {
         AttemptsKey { hard, cheat: false }
     }
 
+    /// Creates a new [`AttemptsKey`] marked as a cheating key.
+    ///
+    /// Using a key created by this function to make an [`Attempts`] will mark
+    /// that instance as cheating as well, and passing that instance to
+    /// [`Puzzle::check()`] will cause the puzzle to become poisoned.
+    /// The test harness will detect this and refuse to provide performance
+    /// records after a puzzle is poisoned.
     pub fn new_cheat(hard: bool) -> AttemptsKey {
         AttemptsKey { hard, cheat: true }
     }
@@ -600,7 +607,7 @@ mod test {
 
         ($fn_name:ident[hard = $hard:expr, $answer:expr => $( [$guess:expr, $works:expr, $res:expr] );*] $other:block) => {
             #[test]
-            fn $fn_name() -> Result<(), WordleError> {
+            fn $fn_name() -> Result<()> {
                 let mut attempts = Attempts::cheat($hard);
                 let mut puzzle = Puzzle::new(Word::from_str($answer)?);
                 let mut count = 0;

@@ -13,7 +13,7 @@ Have you ever gotten so obsessed with [Wordle](https://www.powerlanguage.co.uk/w
 This crate is a part of the `wordle_rs` project, which has three parts:
 - [`wordle_rs`](https://crates.io/crates/wordle_rs), a library with tools you can use to write and evaluate your own Wordle strategies,
 - [`wordle_strategies`](https://crates.io/crates/wordle_strategies), a library demonstrating a few strategies that I wrote, and
-- `wordle_runner` (WIP), a binary that can run and compare Wordle strategies written with `wordle_rs`.
+- `wordle_runner` (WIP), a command line program that can run and compare Wordle strategies written with `wordle_rs`.
 
 Please feel free to contribute your own strategies to `wordle_strategies`!
 
@@ -78,6 +78,26 @@ fn main() -> Result<(), WordleError> {
 ## Using `wordle_runner`
 
 Forthcoming.
+
+## Crate level documentation for `wordle_rs`
+
+### Examples
+
+Examples of how to build your own strategies are available in the
+`wordle_strategies` folder in this repository, which contains the code for
+the crate of the same name.
+
+### Build features
+
+The `wordle_rs` crate supports disabling some non-crucial functionality, allowing it to build without some major dependencies.
+Below is a list of all of the features:
+
+- `serde`*: allows serializing and deserializing performance records and includes mechanisms for loading and saving baselines
+- `stats`*: enables statistical comparisons between performance records
+- `fancy`*: enables fancy display with colors, progress bars, and tables
+- `parallel`*: allows running the test harness in parallel
+
+*: enabled by default
 
 ## License
 

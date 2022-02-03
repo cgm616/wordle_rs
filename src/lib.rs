@@ -5,6 +5,8 @@
 #[cfg(feature = "serde")]
 extern crate serde_crate as serde;
 
+use std::error::Error as StdError;
+
 use thiserror::Error;
 
 pub mod strategy;
@@ -16,35 +18,57 @@ pub mod harness;
 pub use harness::Harness;
 
 pub mod perf;
-pub use perf::{Perf, Summary, SummaryPrintOptions};
+pub use perf::{Perf, PrintOptions, Summary};
 
 #[cfg(feature = "stats")]
 mod stats;
 
+/// A convenient redefinition of [`std::result::Result`] that uses [`WordleError`]
+/// as the error type.
 pub type Result<T> = std::result::Result<T, WordleError>;
 
 /// The errors that `wordle_rs` can produce.
 #[derive(Debug, Error)]
 pub enum WordleError {
-    #[error("puzzle encountered error")]
+    /// An error belonging to the part of this crate used to implement
+    /// strategies.
+    #[error(transparent)]
     Puzzle {
+        /// The kind of error reached.
         #[from]
         kind: PuzzleError,
     },
 
-    #[error("general IO error")]
+    /// Could not print.
+    #[error("IO error while printing")]
     Printing(#[from] std::io::Error),
 
+    /// Attempted to compare a strategy with itself.
     #[error("cannot compare a strategy with itself")]
     SelfComparison,
 
-    #[error("the test harness encountered an error")]
+    /// An error belonging to the part of this crate used to run strategies
+    /// (i.e. the test harness).
+    #[error(transparent)]
     Harness {
+        /// The kind of error reached.
         #[from]
         kind: HarnessError,
     },
 }
 
+/// The errors that the "puzzle" side of this crate can produce.
+///
+/// This type can be wrapped in a [`WordleError`] with the
+/// [`Puzzle`](WordleError::Puzzle) variant, and that is often how
+/// consumers of this crate will find it.
+///
+/// # Examples
+/// ```
+/// # use wordle_rs::{PuzzleError, WordleError};
+/// let error = PuzzleError::OutOfGuesses;
+/// let wrapped: WordleError = error.into();
+/// ```
 #[derive(Debug, Error)]
 pub enum PuzzleError {
     /// The index provided when constructing a Wordle word does not correspond
@@ -67,24 +91,35 @@ pub enum PuzzleError {
     InvalidHardmodeGuess,
 }
 
+/// The errors that the "harness" side of this crate can produce.
+///
+/// This type can be wrapped in a [`WordleError`] with the
+/// [`Puzzle`](WordleError::Harness) variant, and this is often how
+/// consumers of this crate will find it.
+///
+/// # Examples
+/// ```
+/// # use wordle_rs::{HarnessError, WordleError};
+/// let error = HarnessError::BaselineAlreadySet;
+/// let wrapped: WordleError = error.into();
+/// ```
 #[derive(Debug, Error)]
 pub enum HarnessError {
+    /// The test harness already has a baseline.
     #[error("test harness already has a baseline")]
     BaselineAlreadySet,
 
-    #[error("cannot save baseline unless one is set to run")]
-    BaselineNotRun,
-
+    /// The test harness could not find and deserialize a baseline file
+    /// with the specified name.
     #[error("could not read or write baseline file")]
-    BaselineIo(#[from] std::io::Error),
+    BaselineRead(#[source] Box<dyn StdError + Send>),
 
-    #[error("a baseline file of that name does not exist")]
-    BaselineDoesntExist,
-
+    /// The test harness could not write the strategy records to disk.
     #[cfg(feature = "serde")]
-    #[error("trouble serializing or deserializing baseline")]
-    Serde(#[from] serde_json::Error),
+    #[error("could not write summary to disk")]
+    SummaryWrite(#[source] Box<dyn StdError + Send>),
 
+    /// Cannot run the test harness without adding strategies.
     #[error("no strategies have been added to the harness")]
     NoStrategiesAdded,
 

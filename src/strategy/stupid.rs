@@ -8,7 +8,8 @@ use crate::strategy::{Attempts, AttemptsKey, Puzzle, Strategy, Word};
 ///
 /// This exists to show how [`Strategy`](super::Strategy) is implemented. It
 /// is not recommended to run your own strategies against it.
-/// For that, check out the [`wordle_strategies`]() crate.
+/// For that, check out the
+/// [`wordle_strategies`](https://crates.io/crates/wordle_strategies) crate.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Stupid;
 
