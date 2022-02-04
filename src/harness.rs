@@ -306,13 +306,13 @@ impl Harness {
         } else {
             // try all words
 
-            #[cfg(feature = "parallel")]
+            #[cfg(all(feature = "parallel", not(feature = "fancy")))]
             (0..ANSWERS.len())
                 .into_par_iter()
                 .map(|i| self.run_inner(ANSWERS[i], perfs.clone()))
                 .collect::<Result<(), WordleError>>()?;
 
-            #[cfg(not(feature = "parallel"))]
+            #[cfg(all(not(feature = "parallel"), not(feature = "fancy")))]
             (0..ANSWERS.len())
                 .into_iter()
                 .map(|i| self.run_inner(ANSWERS[i], perfs.clone()))
