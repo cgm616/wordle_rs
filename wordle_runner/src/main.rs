@@ -4,6 +4,7 @@ use wordle_strategies::{Basic, Common};
 fn main() -> Result<(), WordleError> {
     let harness = Harness::new()
         .verbose(true)
+        .parallel(true)
         .add_strategy(Box::new(Common), None)
         .add_strategy(
             Box::new(Basic::new().first_word(Word::from_str("qajaq").unwrap())),

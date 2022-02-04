@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Crate features for enabling and disabling certain non-crucial capabilities (see docs for more info)
 - Comparison against baselines using stats
 - Saving and loading baselines from disk
+- Allow running harness in parallel or not
 
 ### Changes
 - Fix typos in READMEs
