@@ -189,7 +189,7 @@ impl Harness {
     ///
     /// Note that this function will ignore the testing and parallelism settings
     /// of the harness.
-    pub fn debug_run(&self, words: Option<&[Word]>) -> Result<Vec<Perf>, WordleError> {
+    pub fn debug_run(&self, words: Option<&[Word]>) -> Result<Record, WordleError> {
         use std::panic::{self, AssertUnwindSafe};
 
         self.pre_run_check()?;
@@ -237,14 +237,7 @@ impl Harness {
             }
         }
 
-        Ok(perfs)
-
-        // words
-        //     .iter()
-        //     .progress()
-        //     .map(|w| )
-        //     .collect::<Result<(), WordleError>>()
-        //     .map(|_| Arc::try_unwrap(perfs).unwrap().into_inner().unwrap())
+        Ok(Record::new(perfs, self.baseline.clone()))
     }
 
     /// Runs the harness and produces performances for each strategy.
