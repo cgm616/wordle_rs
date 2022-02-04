@@ -21,6 +21,11 @@ use crate::{
     HarnessError, Result, Summary, WordleError,
 };
 
+#[cfg(not(target_family = "wasm"))]
+mod wasm;
+#[cfg(not(target_family = "wasm"))]
+pub use wasm::WasmWrapper;
+
 /// A test harness that can run many strategies on many puzzles.
 ///
 /// When you want to test your strategies, create a new test harness
@@ -431,31 +436,30 @@ impl Record {
                         Ok(()) => {}
                         Err(WordleError::SelfComparison) => {
                             printed_baseline = true;
-                            summary
-                                .print(
-                                    Summary::print_options()
-                                        .histogram(true)
-                                        .baseline(&self.baseline),
-                                )
-                                .unwrap()
+                            summary.print(
+                                Summary::print_options()
+                                    .histogram(true)
+                                    .baseline(&self.baseline),
+                            )?;
                         }
                         Err(e) => return Err(e),
                     }
+                    println!("");
                 }
                 if !printed_baseline {
-                    baseline_summary
-                        .print(
-                            Summary::print_options()
-                                .histogram(true)
-                                .baseline(&self.baseline),
-                        )
-                        .unwrap()
+                    baseline_summary.print(
+                        Summary::print_options()
+                            .histogram(true)
+                            .baseline(&self.baseline),
+                    )?;
+                    println!("");
                 }
             }
             None => {
                 for perf in self.perfs.iter() {
                     let summary = perf.to_summary();
                     summary.print(Summary::print_options().histogram(true))?;
+                    println!("");
                 }
             }
         }

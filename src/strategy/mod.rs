@@ -16,9 +16,6 @@ use crate::{
 
 pub mod stupid;
 
-mod wrapper;
-pub(crate) use wrapper::Wrapper;
-
 /// A Wordle word.
 ///
 /// This struct represents a possible Wordle guess, and its construction
@@ -30,7 +27,7 @@ pub(crate) use wrapper::Wrapper;
     serde(crate = "serde_crate")
 )]
 pub struct Word {
-    pub(crate) index: usize,
+    pub(crate) index: u32,
 }
 
 impl Word {
@@ -53,7 +50,9 @@ impl Word {
     /// ```
     pub fn from_index(index: usize) -> Result<Self> {
         if index < GUESSES.len() {
-            Ok(Word { index })
+            Ok(Word {
+                index: index as u32,
+            })
         } else {
             Err(PuzzleError::InvalidIndex(index).into())
         }
@@ -80,7 +79,9 @@ impl Word {
     pub fn from_str(word: &str) -> Result<Self> {
         GUESSES
             .binary_search(&word)
-            .map(|index| Word { index })
+            .map(|index| Word {
+                index: index as u32,
+            })
             .map_err(|_| PuzzleError::NotInWordlist(word.to_string()).into())
     }
 }
@@ -89,7 +90,7 @@ impl Deref for Word {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        crate::words::GUESSES[self.index]
+        crate::words::GUESSES[self.index as usize]
     }
 }
 
@@ -130,7 +131,7 @@ impl Display for Word {
 /// ```
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Puzzle {
-    word: Word,
+    pub(crate) word: Word,
     pub(crate) poisoned: bool,
 }
 
@@ -297,6 +298,16 @@ impl Puzzle {
 
         Ok(())
     }
+
+    #[cfg(target_family = "wasm")]
+    pub fn __secret_new(word: Word, poisoned: bool) -> Self {
+        Self { word, poisoned }
+    }
+
+    #[cfg(target_family = "wasm")]
+    pub fn __secret_is_poisoned(&self) -> bool {
+        self.poisoned
+    }
 }
 
 /// A Wordle "grade" that indicates the correctness of a letter in a guess.
@@ -322,9 +333,11 @@ pub enum Grade {
 ///
 /// This exists to allow strategies to produce only one instance of
 /// [`Attempts`] while running.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(C)]
 pub struct AttemptsKey {
-    hard: bool,
-    cheat: bool,
+    pub(crate) hard: bool,
+    pub(crate) cheat: bool,
 }
 
 impl AttemptsKey {
@@ -346,6 +359,21 @@ impl AttemptsKey {
     /// Use the key to produce an instance of [`Attempts`].
     pub fn unlock(self) -> Attempts {
         Attempts::new(self.hard, self.cheat)
+    }
+
+    pub(crate) fn from_i32(other: i32) -> Self {
+        let other = other as u16;
+        unsafe { std::mem::transmute::<u16, AttemptsKey>(other) }
+    }
+
+    pub(crate) fn to_i32(self) -> i32 {
+        let almost: u16 = unsafe { std::mem::transmute::<AttemptsKey, u16>(self) };
+        almost as i32
+    }
+
+    #[cfg(target_family = "wasm")]
+    pub fn __secret_new(hard: bool, cheat: bool) -> Self {
+        Self { hard, cheat }
     }
 }
 
@@ -375,7 +403,9 @@ impl AttemptsKey {
 /// assert_eq!(attempts.inner()[0].deref(), "tithe");
 /// assert!(!attempts.finished());
 /// ```
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Default, Deserialize)]
+#[serde(crate = "serde_crate")]
+#[cfg_attr(target_family = "wasm", derive(Serialize))]
 pub struct Attempts {
     inner: Vec<Word>,
     pub(crate) hard: bool,
@@ -559,7 +589,7 @@ pub trait Strategy: Display + Debug + Sync {
     /// the strategy in order to produce meaningful comparisons. The value of
     /// this function for a particular instance of the strategy
     /// should not change it is configured.
-    fn version(&self) -> &'static str;
+    fn version(&self) -> &str;
 
     /// Describes if this strategy should be run on hardmode or easymode.
     ///
@@ -800,5 +830,23 @@ mod test {
         ["wisps", true, "iiaac"];
         ["slots", false, ""];
         ["spots", true, "ccccc"]]
+    }
+
+    #[test]
+    fn attemptskey_and_i32() {
+        let key1 = AttemptsKey::new(false);
+        let key2 = AttemptsKey::new(true);
+        let key3 = AttemptsKey::new_cheat(false);
+        let key4 = AttemptsKey::new_cheat(true);
+
+        let int1: i32 = key1.to_i32();
+        let int2: i32 = key2.to_i32();
+        let int3: i32 = key3.to_i32();
+        let int4: i32 = key4.to_i32();
+
+        assert_eq!(AttemptsKey::new(false), AttemptsKey::from_i32(int1));
+        assert_eq!(AttemptsKey::new(true), AttemptsKey::from_i32(int2));
+        assert_eq!(AttemptsKey::new_cheat(false), AttemptsKey::from_i32(int3));
+        assert_eq!(AttemptsKey::new_cheat(true), AttemptsKey::from_i32(int4));
     }
 }

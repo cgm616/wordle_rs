@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+use serde::{Deserialize, Serialize};
 use wordle_rs::{
     strategy::{Attempts, AttemptsKey, Puzzle, Strategy, Word},
     words::GUESSES,
@@ -34,7 +35,7 @@ use crate::util::Information;
 /// let configured = Basic::new().first_word(Word::from_str("tests")?);
 /// # Ok::<_, wordle_rs::WordleError>(())
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize)]
 pub struct Basic {
     first_word: Option<Word>,
 }
@@ -43,8 +44,8 @@ impl Basic {
     /// Creates a new instance with default configuration.
     ///
     /// The default option is to use no specific starting word.
-    pub fn new() -> Self {
-        Self::default()
+    pub const fn new() -> Self {
+        Self { first_word: None }
     }
 
     /// Makes the strategy guess a specific first word.

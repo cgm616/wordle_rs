@@ -6,11 +6,7 @@
 #[cfg(feature = "serde")]
 extern crate serde_crate as serde;
 
-<<<<<<< HEAD
 use std::error::Error as StdError;
-=======
-use std::error::Error as ErrorTrait;
->>>>>>> ec7b78a (Add some basic sketch code)
 
 use thiserror::Error;
 
@@ -20,15 +16,19 @@ pub use strategy::{Attempts, AttemptsKey, Grade, Puzzle, Strategy, Word};
 
 pub mod words;
 
+#[cfg(not(target_family = "wasm"))]
 pub mod harness;
 #[doc(inline)]
+#[cfg(not(target_family = "wasm"))]
 pub use harness::{Harness, Record};
 
+#[cfg(not(target_family = "wasm"))]
 pub mod perf;
 #[doc(inline)]
+#[cfg(not(target_family = "wasm"))]
 pub use perf::{Comparison, Perf, PrintOptions, Summary};
 
-#[cfg(feature = "stats")]
+#[cfg(all(feature = "stats", not(target_family = "wasm")))]
 mod stats;
 
 #[cfg(test)]
@@ -50,18 +50,22 @@ pub enum WordleError {
         kind: PuzzleError,
     },
 
+    #[cfg(not(target_family = "wasm"))]
     /// Could not print.
     #[error("IO error while printing")]
     Printing(#[from] std::io::Error),
 
+    #[cfg(not(target_family = "wasm"))]
     /// Attempted to compare a strategy with itself.
     #[error("cannot compare a strategy with itself")]
     SelfComparison,
 
+    #[cfg(not(target_family = "wasm"))]
     /// Attempted to run stats on bad performance data.
     #[error("can not run stats on this data")]
     Stats,
 
+    #[cfg(not(target_family = "wasm"))]
     /// An error belonging to the part of this crate used to run strategies
     /// (i.e. the test harness).
     #[error(transparent)]
@@ -118,6 +122,7 @@ pub enum PuzzleError {
 /// let error = HarnessError::BaselineAlreadySet;
 /// let wrapped: WordleError = error.into();
 /// ```
+#[cfg(not(target_family = "wasm"))]
 #[derive(Debug, Error)]
 pub enum HarnessError {
     /// The test harness already has a baseline.
@@ -148,5 +153,5 @@ pub enum HarnessError {
     StrategyCheated(String),
 
     #[error("could not load, compile, or instantiate wasm module:\n{0}")]
-    Wasm(#[source] Box<dyn ErrorTrait + Send>),
+    Wasm(#[source] Box<dyn StdError + Send>),
 }

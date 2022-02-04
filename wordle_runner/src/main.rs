@@ -1,4 +1,8 @@
-use wordle_rs::{harness::Harness, strategy::Word, WordleError};
+use wordle_rs::{
+    harness::{Harness, WasmWrapper},
+    strategy::Word,
+    WordleError,
+};
 use wordle_strategies::{Basic, Common};
 
 fn main() -> Result<(), WordleError> {
@@ -16,6 +20,7 @@ fn main() -> Result<(), WordleError> {
         .load_baseline("basic_pints", None)?
         // .test_num(200);
         .test_all();
+    //let perfs = harness.debug_run(Some(&[Word::from_str("those")?, Word::from_str("these")?]))?;
     let perfs = harness.run()?;
 
     perfs.print_report()
