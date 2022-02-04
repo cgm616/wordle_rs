@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![doc = include_str!("../README.md")]
 #![deny(missing_docs)]
 
@@ -10,15 +11,18 @@ use std::error::Error as StdError;
 use thiserror::Error;
 
 pub mod strategy;
+#[doc(inline)]
 pub use strategy::{Attempts, AttemptsKey, Grade, Puzzle, Strategy, Word};
 
 pub mod words;
 
 pub mod harness;
-pub use harness::Harness;
+#[doc(inline)]
+pub use harness::{Harness, Record};
 
 pub mod perf;
-pub use perf::{Perf, PrintOptions, Summary};
+#[doc(inline)]
+pub use perf::{Comparison, Perf, PrintOptions, Summary};
 
 #[cfg(feature = "stats")]
 mod stats;
@@ -85,7 +89,7 @@ pub enum PuzzleError {
     #[error("the puzzle has already evaluated six guesses")]
     OutOfGuesses,
 
-    /// The word provided to [`Puzzle::guess()`](strategy::Puzzle::guess())
+    /// The word provided to [`Puzzle::check()`](strategy::Puzzle::check())
     /// does not follow Wordle hardmode rules.
     #[error("that guess does not follow hardmode rules")]
     InvalidHardmodeGuess,

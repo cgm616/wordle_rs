@@ -90,7 +90,7 @@ the crate of the same name.
 ### Build features
 
 The `wordle_rs` crate supports disabling some non-crucial functionality, allowing it to build without some major dependencies.
-Below is a list of all of the features:
+Here are the features and their effects:
 
 - `serde`*: allows serializing and deserializing performance records and includes mechanisms for loading and saving baselines
 - `stats`*: enables statistical comparisons between performance records
@@ -101,4 +101,4 @@ Below is a list of all of the features:
 
 ## License
 
-Everything in this project is licensed under the [MIT license](LICENSE).
+Everything in this project is licensed under the [MIT license](https://github.com/cgm616/wordle_rs/blob/master/LICENSE).

@@ -111,8 +111,7 @@ impl Perf {
         (self.num_missed() as f32) / (self.num_tried() as f32)
     }
 
-    /// Prints the strategy's summary and then output a table showing the
-    /// strategy's attempts for each puzzle.
+    /// Prints a table showing the guesses the strategy made on puzzles.
     #[cfg(feature = "fancy")]
     pub fn print(&self) {
         let mut table = Table::new();
@@ -198,7 +197,7 @@ impl Summary {
     /// Gets the number of puzzles solved by the strategy.
     ///
     /// This function always returns a number less than or equal to
-    /// [`num_tried()`](PerfSummary::num_tried()).
+    /// [`num_tried()`](Summary::num_tried()).
     pub fn num_solved(&self) -> u32 {
         self.num_solved
     }
@@ -249,7 +248,8 @@ impl Summary {
     /// When the `stats` build feature is enabled (see the feature description
     /// in the [crate-level documentation](`crate#build-features`)) then this
     /// function will perform hypothesis tests on the two summaries and return
-    /// the results in `Comparison`.
+    /// the results in `Comparison`. In this case, it will use a threshold
+    /// p-value of `0.05`.
     pub fn compare<'a, 'b>(
         &'a self,
         baseline: &'b Summary,
@@ -286,7 +286,7 @@ impl Summary {
                 )?;
 
                 #[cfg(feature = "stats")]
-                if comparison.solved.two_tail_pvalue < 0.05 {
+                if comparison.is_sig_solved() {
                     #[cfg(feature = "fancy")]
                     writeln!(
                         stdout,
@@ -357,7 +357,7 @@ impl Summary {
                 )?;
 
                 #[cfg(feature = "stats")]
-                if comparison.guesses.is_significant() {
+                if comparison.is_sig_guesses() {
                     #[cfg(feature = "fancy")]
                     writeln!(
                         stdout,
@@ -414,9 +414,6 @@ impl Summary {
                     self.mean_guesses(),
                     comparison.mean_guesses_diff(),
                 )?;
-
-                #[cfg(feature = "stats")]
-                writeln!(stdout, "P-value: {}", comparison.guesses.p)?;
             }
             None => {
                 if let Some(s) = options.baseline {
@@ -462,7 +459,7 @@ impl Summary {
     /// it.)
     ///
     /// To get the `dir` the same way that the test harness does, use
-    /// [`get_save_dir()`](crate::harness:get_save_dir).
+    /// [`get_save_dir()`](crate::harness:get_save_dir<'a>()).
     #[cfg(feature = "serde")]
     pub fn from_saved(name: &str, dir: impl AsRef<Path>) -> Result<Summary, WordleError> {
         let dir = dir.as_ref();
@@ -483,11 +480,11 @@ impl Summary {
 
     /// Saves the summary with a particular name and in a particular directory.
     ///
-    /// When `force` is true, this will overwrite any "[name].json" file
+    /// When `force` is true, this will overwrite any "\[name\].json" file
     /// in the passed directory.
     ///
     /// To get the `dir` the same way that the test harness does, use
-    /// [`get_save_dir()`](crate::harness:get_save_dir).
+    /// [`get_save_dir()`](crate::harness:get_save_dir<'a>()).
     #[cfg(feature = "serde")]
     pub fn save(
         &self,
@@ -578,6 +575,8 @@ pub struct Comparison<'a, 'b> {
     solved: FishersExactPvalues,
     #[cfg(feature = "stats")]
     guesses: WelchsT<f64>,
+    #[cfg(feature = "stats")]
+    alpha: f64,
 }
 
 impl<'a, 'b> Comparison<'a, 'b> {
@@ -622,6 +621,8 @@ impl<'a, 'b> Comparison<'a, 'b> {
             solved,
             #[cfg(feature = "stats")]
             guesses,
+            #[cfg(feature = "stats")]
+            alpha,
         }
     }
 
@@ -694,6 +695,40 @@ impl<'a, 'b> Comparison<'a, 'b> {
     /// of puzzles each strategy ran on.
     pub fn mean_guesses_diff(&self) -> f32 {
         self.this.mean_guesses() - self.baseline.mean_guesses()
+    }
+
+    /// Indicates if the two summaries had a significantly different number
+    /// of guesses per solved puzzle.
+    ///
+    /// Internally, the comparison uses Welch's t-test with the p-value passed
+    /// when creating this instance.
+    #[cfg(feature = "stats")]
+    pub fn is_sig_guesses(&self) -> bool {
+        self.guesses.p < self.alpha
+    }
+
+    /// Returns p-value from Welch's t-test run on the number of guesses each
+    /// strategy used to solve a puzzles, excluding those it did not solve.
+    #[cfg(feature = "stats")]
+    pub fn guesses_p_value(&self) -> f64 {
+        self.guesses.p
+    }
+
+    /// indicates if the two summaries had a significantly different fraction
+    /// of solved puzzles.
+    ///
+    /// Internally, the comparison uses Fisher's exact test with the p-value passed
+    /// when creating this instance.
+    #[cfg(feature = "stats")]
+    pub fn is_sig_solved(&self) -> bool {
+        self.solved_p_value() < self.alpha
+    }
+
+    /// Returns the p-value from Fisher's exact test run on the proportion of
+    /// solved puzzles to missed puzzles for each strategy.
+    #[cfg(feature = "stats")]
+    pub fn solved_p_value(&self) -> f64 {
+        self.solved.two_tail_pvalue
     }
 }
 

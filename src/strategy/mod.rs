@@ -350,19 +350,19 @@ impl AttemptsKey {
 ///
 /// Strategies must return this, and the struct simply wraps a [`Vec`] to
 /// ensure that strategies cannot inflate their performance. While implementing
-/// [`Strategy::solve()`], you must create an instance of [`Attempts`] and
-/// pass a mutable reference to it to [`Puzzle::check()`], which updates it.
-///
-/// There are some helper methods to make stopping your algorithms possible.
+/// [`Strategy::solve()`], you must create an instance of [`Attempts`] by
+/// calling [`AttemptsKey::unlock()`] on the `key` parameter. Then,
+/// [`Puzzle::check()`] will update the attempts for you.
 ///
 /// # Examples
 ///
 /// ```rust
 /// # use std::ops::Deref;
 /// # use wordle_rs::strategy::Attempts;
-/// use wordle_rs::strategy::{Puzzle, Word};
+/// use wordle_rs::strategy::{Puzzle, Word, AttemptsKey};
 ///
-/// let mut attempts = Attempts::cheat(true);
+/// let key = AttemptsKey::new_cheat(true);
+/// let mut attempts = key.unlock();
 /// let mut puzzle = Puzzle::new(Word::from_str("limit").unwrap());
 /// let (_, _) = puzzle
 ///     .check(&Word::from_str("tithe").unwrap(), &mut attempts)

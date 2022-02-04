@@ -3,16 +3,16 @@ use wordle_strategies::{Basic, Common};
 
 fn main() -> Result<(), WordleError> {
     let harness = Harness::new()
-        .verbose()
-        .add_strategy(Box::new(Common), "common")
+        .verbose(true)
+        .add_strategy(Box::new(Common), None)
         .add_strategy(
-            Box::new(Basic::new().first_word(Word::from_str("pints").unwrap())),
-            "basic_pints",
+            Box::new(Basic::new().first_word(Word::from_str("qajaq").unwrap())),
+            None,
         )
         // .add_strategy(Box::new(
         //     Basic::new().first_word(Word::from_str("qajaq").unwrap()),
         // ))
-        .load_baseline("basic_qajaq", None)?
+        .load_baseline("basic_pints", None)?
         // .test_num(200);
         .test_all();
     let perfs = harness.run()?;

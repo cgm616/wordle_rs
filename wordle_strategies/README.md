@@ -46,4 +46,4 @@ fn main() -> Result<(), WordleError> {
 
 ## License
 
-Everything in this project is licensed under the [MIT license](../LICENSE).
+Everything in this project is licensed under the [MIT license](https://github.com/cgm616/wordle_rs/blob/master/LICENSE).

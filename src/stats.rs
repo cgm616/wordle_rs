@@ -111,6 +111,7 @@ impl<N: Float + Sum + Into<f64>> WelchsT<N> {
         Self { p, alpha, tails }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn is_significant(&self) -> bool {
         self.p < self.alpha
     }

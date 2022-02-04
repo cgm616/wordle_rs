@@ -35,7 +35,7 @@ use crate::{
 /// use wordle_rs::strategy::stupid::Stupid;
 ///
 /// let harness = Harness::new()
-///     .quiet()
+///     .verbose(false)
 ///     .add_strategy(Box::new(Stupid), None)
 ///     .test_num(50);
 ///
@@ -53,7 +53,7 @@ impl Default for Harness {
     fn default() -> Self {
         Harness {
             strategies: Vec::new(),
-            verbose: false,
+            verbose: true,
             num_guesses: Some(100),
             baseline: BaselineOpt::None,
         }
@@ -63,11 +63,13 @@ impl Default for Harness {
 impl Harness {
     /// Creates a new test harness with default configuration.
     ///
-    /// Defaults:
+    /// # Defaults
+    ///
     /// 1. tests no strategies
-    /// 2. quiet mode
+    /// 2. verbose mode
     /// 3. runs each strategy on 100 puzzles chosen at random
     /// 4. does not compare against a baseline
+    /// 5. runs strategies sequentially without rayon
     pub fn new() -> Self {
         Self::default()
     }
@@ -75,11 +77,8 @@ impl Harness {
     /// Makes the harness verbose while testing.
     ///
     /// As of right now, this consists of a progress bar and nothing else.
-    pub fn verbose(self) -> Self {
-        Harness {
-            verbose: true,
-            ..self
-        }
+    pub fn verbose(self, verbose: bool) -> Self {
+        Harness { verbose, ..self }
     }
 
     /// Makes the harness silent while testing.

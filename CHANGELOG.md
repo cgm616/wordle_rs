@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] - ReleaseDate
 
 ### Added
-- Documentation for entire public API
+- Documentation for entire public API, including feature gated functionality
 - Crate features for enabling and disabling certain non-crucial capabilities (see docs for more info)
 - Comparison against baselines using stats
 - Saving and loading baselines from disk
