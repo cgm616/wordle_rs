@@ -178,6 +178,10 @@ impl Harness {
             return Err(HarnessError::NoStrategiesAdded.into());
         }
 
+        if let Some(0) = self.num_guesses {
+            return Err(HarnessError::NoWordsSelected.into());
+        }
+
         Ok(())
     }
 
@@ -187,12 +191,21 @@ impl Harness {
     /// along with the word the strategy was trying to solve, which
     /// is useful for finding bugs in [`Strategy`](crate::Strategy) implementations.
     ///
+    /// If `None` is passed instead of a word list, the harness will run the
+    /// strategies on all possible answers.
+    ///
     /// Note that this function will ignore the testing and parallelism settings
     /// of the harness.
     pub fn debug_run(&self, words: Option<&[Word]>) -> Result<Record, WordleError> {
         use std::panic::{self, AssertUnwindSafe};
 
-        self.pre_run_check()?;
+        match self.pre_run_check() {
+            Err(WordleError::Harness {
+                kind: HarnessError::NoWordsSelected,
+            }) => {}
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
 
         let mut perfs = Vec::new();
         for strat in &self.strategies {

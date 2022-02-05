@@ -123,9 +123,13 @@ pub enum HarnessError {
     #[error("could not write summary to disk")]
     SummaryWrite(#[source] Box<dyn StdError + Send>),
 
-    /// Cannot run the test harness without adding strategies.
+    /// The test harness cannot run without adding at least one strategy.
     #[error("no strategies have been added to the harness")]
     NoStrategiesAdded,
+
+    /// The test harness cannot run on zero words.
+    #[error("test harness configured to run on 0 words")]
+    NoWordsSelected,
 
     /// A strategy created an unauthorized instance of [`Attempts`] and used it
     /// to gain more information about its puzzle.
