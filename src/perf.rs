@@ -94,8 +94,12 @@ impl Perf {
     ///
     /// This function does not include guesses made on puzzles that the
     /// strategy was unable to solve.
-    pub fn guesses_per_solution(&self) -> f32 {
-        (self.cumulative_guesses_solved() as f32) / (self.num_solved() as f32)
+    pub fn mean_guesses(&self) -> Option<f32> {
+        if self.num_solved() > 0 {
+            Some((self.cumulative_guesses_solved() as f32) / (self.num_solved() as f32))
+        } else {
+            None
+        }
     }
 
     /// Gets the number of puzzles the strategy could not solve.
@@ -217,7 +221,7 @@ impl Summary {
         self.histogram
             .iter()
             .enumerate()
-            .map(|(i, v)| i as u32 * v)
+            .map(|(i, v)| (i as u32 + 1) * v)
             .sum::<u32>()
     }
 
@@ -225,8 +229,12 @@ impl Summary {
     ///
     /// This function does not include guesses made on puzzles that the
     /// strategy was unable to solve.
-    pub fn mean_guesses(&self) -> f32 {
-        (self.cumulative_guesses_solved() as f32) / (self.num_solved as f32)
+    pub fn mean_guesses(&self) -> Option<f32> {
+        if self.num_solved() > 0 {
+            Some((self.cumulative_guesses_solved() as f32) / (self.num_solved as f32))
+        } else {
+            None
+        }
     }
 
     /// Gets the number of puzzles the strategy could not solve.
@@ -362,14 +370,19 @@ impl Summary {
                     writeln!(
                         stdout,
                         "Correct guesses took {:.2} ({:.2}) attempts on average, {}",
-                        self.mean_guesses(),
+                        self.mean_guesses().unwrap_or(f32::NAN),
                         comparison
                             .mean_guesses_diff()
+                            .unwrap_or(f32::NAN)
                             .if_supports_color(Stream::Stdout, |text| {
-                                if comparison.mean_guesses_diff().is_sign_negative() {
-                                    text.color(AnsiColors::Green)
+                                if let Some(mean) = comparison.mean_guesses_diff() {
+                                    if mean.is_sign_negative() {
+                                        text.color(AnsiColors::Green)
+                                    } else {
+                                        text.color(AnsiColors::Red)
+                                    }
                                 } else {
-                                    text.color(AnsiColors::Red)
+                                    text.color(AnsiColors::Black)
                                 }
                             }),
                         "a sig. diff.".if_supports_color(Stream::Stdout, |text| text.bold())
@@ -379,15 +392,15 @@ impl Summary {
                     writeln!(
                         stdout,
                         "Correct guesses took {:.2} ({:.2}) attempts on average, a sig. diff.",
-                        self.mean_guesses(),
-                        comparison.mean_guesses_diff(),
+                        self.mean_guesses().unwrap_or(f32::NAN),
+                        comparison.mean_guesses_diff().unwrap_or(f32::NAN),
                     )?;
                 } else {
                     writeln!(
                         stdout,
                         "Correct guesses took {:.2} ({:+.2}) attempts on average, not a sig. diff.",
-                        self.mean_guesses(),
-                        comparison.mean_guesses_diff(),
+                        self.mean_guesses().unwrap_or(f32::NAN),
+                        comparison.mean_guesses_diff().unwrap_or(f32::NAN),
                     )?;
                 }
 
@@ -395,14 +408,19 @@ impl Summary {
                 writeln!(
                     stdout,
                     "Correct guesses took {:.2} ({:.2}) attempts on average",
-                    self.mean_guesses(),
+                    self.mean_guesses().unwrap_or(f32::NAN),
                     comparison
                         .mean_guesses_diff()
+                        .unwrap_or(f32::NAN)
                         .if_supports_color(Stream::Stdout, |text| {
-                            if comparison.mean_guesses_diff().is_sign_negative() {
-                                text.color(AnsiColors::Green)
+                            if let Some(mean) = comparison.mean_guesses_diff() {
+                                if mean.is_sign_negative() {
+                                    text.color(AnsiColors::Green)
+                                } else {
+                                    text.color(AnsiColors::Red)
+                                }
                             } else {
-                                text.color(AnsiColors::Red)
+                                text.color(AnsiColors::Black)
                             }
                         }),
                 )?;
@@ -411,8 +429,8 @@ impl Summary {
                 writeln!(
                     stdout,
                     "Correct guesses took {:.2} ({:.2}) attempts on average",
-                    self.mean_guesses(),
-                    comparison.mean_guesses_diff(),
+                    self.mean_guesses().unwrap_or(f32::NAN),
+                    comparison.mean_guesses_diff().unwrap_or(f32::NAN),
                 )?;
             }
             None => {
@@ -435,7 +453,7 @@ impl Summary {
                 writeln!(
                     stdout,
                     "Correct guesses took {:.2} attempts on average",
-                    self.mean_guesses(),
+                    self.mean_guesses().unwrap_or(f32::NAN),
                 )?;
             }
         }
@@ -691,10 +709,14 @@ impl<'a, 'b> Comparison<'a, 'b> {
     /// Returns the difference between the number of guesses used by the strategies
     /// in each puzzle they solved.
     ///
-    /// This function always works no matter the different between the number
-    /// of puzzles each strategy ran on.
-    pub fn mean_guesses_diff(&self) -> f32 {
-        self.this.mean_guesses() - self.baseline.mean_guesses()
+    /// This function works no matter the different between the number
+    /// of puzzles each strategy ran on. However, it returns `None` when the
+    /// strategies succeeded on no puzzles.
+    pub fn mean_guesses_diff(&self) -> Option<f32> {
+        match (self.this.mean_guesses(), self.baseline.mean_guesses()) {
+            (Some(this), Some(baseline)) => Some(this - baseline),
+            _ => None,
+        }
     }
 
     /// Indicates if the two summaries had a significantly different number
