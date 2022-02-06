@@ -1,6 +1,6 @@
 [package]
 name = "wordle_strategies"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 authors = ["cgm616 <cargo@cgm616.me>"]
 rust-version = "1.58"
@@ -15,4 +15,4 @@ readme = "README.md"
 itertools = "0.10"
 lazy_static = "1.4"
 regex = "1.5"
-wordle_rs = { version = "0.1", path = "../" }
+wordle_rs = { version = "0.2", path = "../" }

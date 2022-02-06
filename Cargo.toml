@@ -6,7 +6,7 @@ members = [
 
 [package]
 name = "wordle_rs"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 authors = ["cgm616 <cargo@cgm616.me>"]
 rust-version = "1.58"

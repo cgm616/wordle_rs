@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - ReleaseDate
 
+## [0.2.0] - 2022-02-06
+
 ### Added
 - Documentation for entire public API, including feature gated functionality
 - Crate features for enabling and disabling certain non-crucial capabilities (see docs for more info)
@@ -34,7 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic functionality
 
 <!-- next-url -->
-[Unreleased]: https://github.com/cgm616/wordle_rs/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/cgm616/wordle_rs/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/cgm616/wordle_rs/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/cgm616/wordle_rs/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/cgm616/wordle_rs/compare/v0.1.0...v0.1.1
 [v0.1.0]: https://github.com/cgm616/wordle_rs/compare/2f81bb157a9a2de16ad2721488756feec1084d77...v0.1.0

@@ -23,7 +23,7 @@ Add the following to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-wordle_rs = "0.1.2"
+wordle_rs = "0.2.0"
 ```
 
 Then, define a new struct and implement the `Strategy` trait for it.
@@ -48,8 +48,8 @@ To run a pre-made strategy (possibly against your own!), first add the following
 
 ```toml
 [dependencies]
-wordle_rs = "0.1.2"
-wordle_strategies = "0.1.2"
+wordle_rs = "0.2.0"
+wordle_strategies = "0.2.0"
 ```
 
 Then, import a strategy and run the `wordle_rs` test harness on your strategy.

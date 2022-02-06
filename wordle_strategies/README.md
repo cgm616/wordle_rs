@@ -23,8 +23,8 @@ To run a strategy from this crate, first add the following to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-wordle_rs = "0.1.2"
-wordle_strategies = "0.1.2"
+wordle_rs = "0.2.0"
+wordle_strategies = "0.2.0"
 ```
 
 Then, import a strategy and run the `wordle_rs` test harness on your strategy.
