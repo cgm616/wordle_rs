@@ -27,6 +27,9 @@ pub use perf::{Comparison, Perf, PrintOptions, Summary};
 #[cfg(feature = "stats")]
 mod stats;
 
+#[cfg(test)]
+mod mock;
+
 /// A convenient redefinition of [`std::result::Result`] that uses [`WordleError`]
 /// as the error type.
 pub type Result<T> = std::result::Result<T, WordleError>;
@@ -50,6 +53,10 @@ pub enum WordleError {
     /// Attempted to compare a strategy with itself.
     #[error("cannot compare a strategy with itself")]
     SelfComparison,
+
+    /// Attempted to run stats on bad performance data.
+    #[error("can not run stats on this data")]
+    Stats,
 
     /// An error belonging to the part of this crate used to run strategies
     /// (i.e. the test harness).

@@ -1,7 +1,9 @@
-use std::iter::Sum;
+use std::{fmt::Debug, iter::Sum};
 
 use num_traits::Float;
 use statrs::distribution::{ContinuousCDF, StudentsT};
+
+use crate::{Result, WordleError};
 
 #[allow(dead_code)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -86,13 +88,17 @@ impl<N: Float + Sum + Into<f64>> WelchsT<N> {
         b: V,
         alpha: N,
         tails: Tails,
-    ) -> Self {
+    ) -> Result<Self> {
         assert!(alpha > N::from(0_f32).unwrap() && alpha < N::from(1_f32).unwrap());
         // To run the t-test, we need to calculate the test statistic and then
         // compare it against the T distribution.
 
         let a = Sample::new(a);
         let b = Sample::new(b);
+
+        if a.mean.into().abs() < f64::EPSILON || b.mean.into().abs() < f64::EPSILON {
+            return Err(WordleError::Stats);
+        }
 
         // Uses equations from https://statisticaloddsandends.wordpress.com/2020/07/03/welchs-t-test-and-the-welch-satterthwaite-equation/.
 
@@ -108,7 +114,7 @@ impl<N: Float + Sum + Into<f64>> WelchsT<N> {
 
         let p = N::from(dist.cdf((-t).into())).unwrap() * tails.factor::<N>();
 
-        Self { p, alpha, tails }
+        Ok(Self { p, alpha, tails })
     }
 
     #[allow(dead_code)]
@@ -127,15 +133,18 @@ mod test {
     use rand::distributions::Distribution;
     use statrs::{assert_almost_eq, distribution::Normal};
 
+    use std::result::Result as StdResult;
+
     use super::*;
 
     proptest! {
         #[test]
         fn matches_python(
-            f_bar in -5.0_f64..5.0,
-            s_bar in -5.0_f64..5.0,
+            f_bar in 0.5_f64..10.0,
+            s_bar in 0.5_f64..10.0,
             f_std in 0.1_f64..1.0,
-            s_std in 0.1_f64..1.0
+            s_std in 0.1_f64..1.0,
+            samples in 10..1000
         ) {
             const ALPHA: f64 = 0.05;
 
@@ -144,12 +153,12 @@ mod test {
             let f_dist = Normal::new(f_bar, f_std).unwrap();
             let s_dist = Normal::new(s_bar, s_std).unwrap();
 
-            let f_samples: Vec<f64> = (0..1000).map(|_| f_dist.sample(&mut rng)).collect();
-            let s_samples: Vec<f64> = (0..1000).map(|_| s_dist.sample(&mut rng)).collect();
+            let f_samples: Vec<f64> = (0..samples).map(|_| f_dist.sample(&mut rng)).collect();
+            let s_samples: Vec<f64> = (0..samples).map(|_| s_dist.sample(&mut rng)).collect();
 
-            let internal: WelchsT<f64> = WelchsT::two_sample(f_samples.iter().cloned(), s_samples.iter().cloned(), ALPHA, Tails::Two);
+            let internal: WelchsT<f64> = WelchsT::two_sample(f_samples.iter().cloned(), s_samples.iter().cloned(), ALPHA, Tails::Two)?;
 
-            let external: Result<f64, PyErr> = Python::with_gil(|py| {
+            let external: StdResult<f64, PyErr> = Python::with_gil(|py| {
                 let locals = PyDict::new(py);
                 py.run("from scipy import stats", None, Some(locals))?;
                 let stats = locals.get_item("stats").unwrap();

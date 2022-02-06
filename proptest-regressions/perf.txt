@@ -1,0 +1,9 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 3e20afc4971c885ac3f9e004b2d90f0b2640a42a840e35888a64c5f8661d4672 # shrinks to guesses = ["crass"], answers = ["ysame"]
+cc 5767bcc3ff6e9c22b5ef4cf1cc85ac163b33dea044f2eafacee4e8be5d7bab79 # shrinks to guesses1 = ["abray"], guesses2 = ["abray"], answers = ["abbes", "abbot", "abeam", "abear", "abhor", "abmho", "aboil", "aboon", "about", "abram"]
+cc 1a932a1fc3b301db5394a00392dbda199c1f51c1b3c5809f6a3e9efe4beba5e8 # shrinks to guesses = ["aargh", "abler"], answers = ["abbas", "abbed", "abele", "abled", "ablet", "abohm", "aboil", "about", "abram", "abrim"]

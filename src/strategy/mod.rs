@@ -570,7 +570,95 @@ pub trait Strategy: Display + Debug + Sync {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::WordleError;
+    use crate::{words::GUESSES, WordleError};
+
+    #[test]
+    fn word_from_index() -> Result<()> {
+        Word::from_index(GUESSES.len() - 1)?;
+        Word::from_index(5574)?;
+        Word::from_index(GUESSES.len()).unwrap_err();
+
+        Ok(())
+    }
+
+    #[test]
+    fn word_from_str() -> Result<()> {
+        assert_eq!("tithe", Word::from_str("tithe")?.deref());
+        Word::from_str("doubt")?;
+        for word in &GUESSES[4452..4460] {
+            assert_eq!(*word, Word::from_str(word)?.deref());
+        }
+        Word::from_str("aaaaa").unwrap_err();
+        Word::from_str("tithes").unwrap_err();
+
+        Ok(())
+    }
+
+    #[test]
+    fn fmt_word() {
+        assert_eq!("tithe", format!("{}", Word::from_str("tithe").unwrap()));
+        for word in &GUESSES[3141..3149] {
+            assert_eq!(*word, format!("{}", Word::from_str(word).unwrap().deref()));
+        }
+    }
+
+    #[test]
+    fn puzzle_poisoning() -> Result<()> {
+        let mut puzzle = Puzzle::new(Word::from_str("nerds")?);
+        assert!(!puzzle.poisoned);
+
+        let safe_key = AttemptsKey::new(false);
+        let mut safe_attempts = safe_key.unlock();
+
+        let (safe_grades, safe_correct) =
+            puzzle.check(&Word::from_str("doubt")?, &mut safe_attempts)?;
+        assert!(!puzzle.poisoned);
+
+        let cheat_key = AttemptsKey::new_cheat(false);
+        let mut cheat_attempts = cheat_key.unlock();
+
+        let (cheat_grades, cheat_correct) =
+            puzzle.check(&Word::from_str("doubt")?, &mut cheat_attempts)?;
+        assert!(puzzle.poisoned);
+
+        assert_eq!(safe_grades, cheat_grades);
+        assert_eq!(safe_correct, cheat_correct);
+
+        let _ = puzzle.check(&Word::from_str("gorge")?, &mut safe_attempts)?;
+        assert!(puzzle.poisoned);
+
+        Ok(())
+    }
+
+    #[test]
+    fn puzzle_out_of_guesses() -> Result<()> {
+        let mut puzzle = Puzzle::new(Word::from_str("nerds")?);
+
+        let key = AttemptsKey::new(false);
+        let mut attempts = key.unlock();
+
+        for &word in &GUESSES[100..106] {
+            let _ = puzzle.check(&Word::from_str(word)?, &mut attempts)?;
+        }
+
+        assert!(attempts.finished());
+
+        assert!(puzzle
+            .check(&Word::from_str("mount")?, &mut attempts)
+            .is_err());
+
+        assert_eq!(
+            format!(
+                "{}\n{}\n{}\n{}\n{}\n{}",
+                GUESSES[100], GUESSES[101], GUESSES[102], GUESSES[103], GUESSES[104], GUESSES[105]
+            ),
+            format!("{}", attempts)
+        );
+
+        Ok(())
+    }
+
+    // PUZZLE LOGIC TESTS
 
     fn str_to_grades(input: &str) -> [Grade; 5] {
         let mut res = [Grade::Incorrect; 5];

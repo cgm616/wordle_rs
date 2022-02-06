@@ -18,7 +18,7 @@ use crate::{
     perf::Perf,
     strategy::{AttemptsKey, Puzzle, Strategy, Word},
     words::ANSWERS,
-    HarnessError, Summary, WordleError,
+    HarnessError, Result, Summary, WordleError,
 };
 
 /// A test harness that can run many strategies on many puzzles.
@@ -113,12 +113,12 @@ impl Harness {
         self,
         strat: Box<dyn Strategy>,
         save_name: impl Into<Option<&'a str>>,
-    ) -> Result<Self, WordleError> {
+    ) -> Result<Self> {
         self.add_strategy(strat, save_name).and_baseline()
     }
 
     /// Sets the most recently added strategy as the baseline for comparisons.
-    pub fn and_baseline(self) -> Result<Self, WordleError> {
+    pub fn and_baseline(self) -> Result<Self> {
         match self.baseline {
             BaselineOpt::None => Ok(Self {
                 baseline: BaselineOpt::Run(
@@ -139,11 +139,7 @@ impl Harness {
     ///
     /// The `name` must match the name of a baseline saved previously.
     #[cfg(feature = "serde")]
-    pub fn load_baseline<'a>(
-        self,
-        name: &str,
-        dir: impl Into<Option<&'a Path>>,
-    ) -> Result<Self, WordleError> {
+    pub fn load_baseline<'a>(self, name: &str, dir: impl Into<Option<&'a Path>>) -> Result<Self> {
         match self.baseline {
             BaselineOpt::None => {
                 let dir = get_save_dir(dir)?;
@@ -173,7 +169,7 @@ impl Harness {
         }
     }
 
-    fn pre_run_check(&self) -> Result<(), WordleError> {
+    fn pre_run_check(&self) -> Result<()> {
         if self.strategies.is_empty() {
             return Err(HarnessError::NoStrategiesAdded.into());
         }
@@ -196,7 +192,7 @@ impl Harness {
     ///
     /// Note that this function will ignore the testing and parallelism settings
     /// of the harness.
-    pub fn debug_run(&self, words: Option<&[Word]>) -> Result<Record, WordleError> {
+    pub fn debug_run(&self, words: Option<&[Word]>) -> Result<Record> {
         use std::panic::{self, AssertUnwindSafe};
 
         match self.pre_run_check() {
@@ -217,7 +213,7 @@ impl Harness {
             None => ANSWERS
                 .iter()
                 .map(|&i| Word::from_index(i))
-                .collect::<Result<Vec<_>, _>>()
+                .collect::<Result<Vec<_>>>()
                 .unwrap(),
         };
 
@@ -257,8 +253,8 @@ impl Harness {
     ///
     /// The [`Perf`]s will be in the same order as the strategies were added
     /// to the harness.
-    pub fn run(&self) -> Result<Record, WordleError> {
-        fn cleanup(perfs: Arc<Mutex<Vec<Perf>>>, this: &Harness) -> Result<Record, WordleError> {
+    pub fn run(&self) -> Result<Record> {
+        fn cleanup(perfs: Arc<Mutex<Vec<Perf>>>, this: &Harness) -> Result<Record> {
             let perfs = Arc::try_unwrap(perfs).unwrap().into_inner().unwrap();
 
             #[cfg(feature = "serde")]
@@ -354,7 +350,7 @@ impl Harness {
         cleanup(perfs, self)
     }
 
-    fn run_inner(&self, index: usize, perfs: Arc<Mutex<Vec<Perf>>>) -> Result<(), WordleError> {
+    fn run_inner(&self, index: usize, perfs: Arc<Mutex<Vec<Perf>>>) -> Result<()> {
         let word = Word::from_index(index).unwrap();
         let mut puzzle = Puzzle::new(word);
 
@@ -421,7 +417,7 @@ impl Record {
     /// Prints a report detailing each strategy's performance.
     ///
     /// This will use the baseline configuration passed to the test harness.
-    pub fn print_report(&self) -> Result<(), WordleError> {
+    pub fn print_report(&self) -> Result<()> {
         match self.baseline.get_summary(&self.perfs) {
             Some(baseline_summary) => {
                 let mut printed_baseline = false;
@@ -476,7 +472,7 @@ impl Record {
 /// directory in the current working directory (the directory of the running
 /// process.)
 #[cfg(feature = "serde")]
-pub fn get_save_dir<'a>(user: impl Into<Option<&'a Path>>) -> Result<PathBuf, WordleError> {
+pub fn get_save_dir<'a>(user: impl Into<Option<&'a Path>>) -> Result<PathBuf> {
     let user: Option<&Path> = user.into();
     let var = std::env::var_os("WORDLE_BASELINE_DIR");
     let default = std::env::current_dir()
@@ -492,4 +488,22 @@ pub fn get_save_dir<'a>(user: impl Into<Option<&'a Path>>) -> Result<PathBuf, Wo
     };
 
     Ok(dir.to_path_buf())
+}
+
+#[cfg(test)]
+mod test {
+    use std::path::Path;
+
+    use super::*;
+    use crate::mock::Mock;
+
+    #[test]
+    fn save_dir_passthru() -> Result<()> {
+        assert_eq!(
+            Path::new("/temp/testing"),
+            get_save_dir(Some(Path::new("/temp/testing")))?.as_path()
+        );
+
+        Ok(())
+    }
 }

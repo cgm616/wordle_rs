@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     harness::BaselineOpt,
     strategy::{Attempts, Strategy, Word},
-    {HarnessError, WordleError},
+    {HarnessError, Result, WordleError},
 };
 
 #[cfg(feature = "stats")]
@@ -258,27 +258,24 @@ impl Summary {
     /// function will perform hypothesis tests on the two summaries and return
     /// the results in `Comparison`. In this case, it will use a threshold
     /// p-value of `0.05`.
-    pub fn compare<'a, 'b>(
-        &'a self,
-        baseline: &'b Summary,
-    ) -> Result<Comparison<'a, 'b>, WordleError> {
+    pub fn compare<'a, 'b>(&'a self, baseline: &'b Summary) -> Result<Comparison<'a, 'b>> {
         if self == baseline {
             return Err(WordleError::SelfComparison);
         }
 
-        Ok(Comparison::compare(
+        Comparison::compare(
             self,
             baseline,
             #[cfg(feature = "stats")]
             0.05,
-        ))
+        )
     }
 
     /// Prints the [`Summary`] in a configurable way.
     ///
     /// To configure the print, use [`PrintOptions`]. You can create a new
     /// [`PrintOptions`] with [`Summary::print_options()`].
-    pub fn print(&self, options: PrintOptions) -> Result<(), WordleError> {
+    pub fn print(&self, options: PrintOptions) -> Result<()> {
         let mut stdout = std::io::stdout();
         match options.compare {
             Some(baseline) => {
@@ -479,7 +476,7 @@ impl Summary {
     /// To get the `dir` the same way that the test harness does, use
     /// [`get_save_dir()`](crate::harness:get_save_dir<'a>()).
     #[cfg(feature = "serde")]
-    pub fn from_saved(name: &str, dir: impl AsRef<Path>) -> Result<Summary, WordleError> {
+    pub fn from_saved(name: &str, dir: impl AsRef<Path>) -> Result<Summary> {
         let dir = dir.as_ref();
         let mut path = dir.to_path_buf();
         path.push(name);
@@ -504,12 +501,7 @@ impl Summary {
     /// To get the `dir` the same way that the test harness does, use
     /// [`get_save_dir()`](crate::harness:get_save_dir<'a>()).
     #[cfg(feature = "serde")]
-    pub fn save(
-        &self,
-        name: &str,
-        dir: impl AsRef<Path>,
-        force: bool,
-    ) -> Result<PathBuf, WordleError> {
+    pub fn save(&self, name: &str, dir: impl AsRef<Path>, force: bool) -> Result<PathBuf> {
         let dir = dir.as_ref();
         std::fs::create_dir_all(dir).map_err(|e| HarnessError::SummaryWrite(Box::new(e)))?;
 
@@ -607,7 +599,7 @@ impl<'a, 'b> Comparison<'a, 'b> {
         this: &'a Summary,
         baseline: &'b Summary,
         #[cfg(feature = "stats")] alpha: f64,
-    ) -> Self {
+    ) -> Result<Self> {
         #[cfg(feature = "stats")]
         let guesses = WelchsT::two_sample(
             this.histogram
@@ -621,7 +613,7 @@ impl<'a, 'b> Comparison<'a, 'b> {
                 .map(|(i, &v)| (i as f64 + 1.) * v as f64),
             alpha,
             Tails::Two,
-        );
+        )?;
 
         #[cfg(feature = "stats")]
         let solved = fishers_exact::fishers_exact(&[
@@ -632,7 +624,7 @@ impl<'a, 'b> Comparison<'a, 'b> {
         ])
         .unwrap();
 
-        Self {
+        Ok(Self {
             this,
             baseline,
             #[cfg(feature = "stats")]
@@ -641,13 +633,13 @@ impl<'a, 'b> Comparison<'a, 'b> {
             guesses,
             #[cfg(feature = "stats")]
             alpha,
-        }
+        })
     }
 
     /// Returns whether or not the two strategies that produced the summaries
     /// ran on the same number of puzzles.
-    pub fn tries_eq(&self) -> bool {
-        self.this.num_tried == self.baseline.num_tried
+    pub fn tried_eq(&self) -> bool {
+        self.this.num_tried() == self.baseline.num_tried()
     }
 
     /// Returns the number of puzzles that the strategies ran on, if they
@@ -655,8 +647,8 @@ impl<'a, 'b> Comparison<'a, 'b> {
     ///
     /// If the strategies ran on a different number of puzzles, returns [`None`].
     pub fn num_tried(&self) -> Option<u32> {
-        if self.tries_eq() {
-            Some(self.this.num_solved() - self.baseline.num_solved())
+        if self.tried_eq() {
+            Some(self.this.num_tried())
         } else {
             None
         }
@@ -667,9 +659,9 @@ impl<'a, 'b> Comparison<'a, 'b> {
     /// number of puzzles.
     ///
     /// Otherwise, this number is meaningless and the function will return [`None`].
-    pub fn num_solved_diff(&self) -> Option<u32> {
-        if self.tries_eq() {
-            Some(self.this.num_solved() - self.baseline.num_solved())
+    pub fn num_solved_diff(&self) -> Option<i32> {
+        if self.tried_eq() {
+            Some(self.this.num_solved() as i32 - self.baseline.num_solved() as i32)
         } else {
             None
         }
@@ -680,9 +672,9 @@ impl<'a, 'b> Comparison<'a, 'b> {
     /// number of puzzles.
     ///
     /// Otherwise, this number is meaningless and the function will return [`None`].
-    pub fn num_missed_diff(&self) -> Option<u32> {
-        if self.tries_eq() {
-            Some(self.this.num_missed() - self.baseline.num_missed())
+    pub fn num_missed_diff(&self) -> Option<i32> {
+        if self.tried_eq() {
+            Some(self.this.num_missed() as i32 - self.baseline.num_missed() as i32)
         } else {
             None
         }
@@ -825,5 +817,147 @@ impl Display for Histogram {
         Ok(())
 
         // TODO: test this to make sure it never outputs a line longer than 80 characters
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use proptest::prelude::*;
+
+    use super::*;
+    use crate::{mock::Mock, Harness, Result, WordleError};
+
+    #[test]
+    fn perf_correct_stats() -> Result<()> {
+        let words = [
+            Word::from_str("tithe")?,
+            Word::from_str("those")?,
+            Word::from_str("parka")?,
+            Word::from_str("trade")?,
+            Word::from_str("loupe")?,
+            Word::from_str("doubt")?,
+            Word::from_str("sword")?,
+            Word::from_str("knife")?,
+        ];
+
+        let harness = Harness::new()
+            .parallel(false)
+            .add_strategy(Box::new(Mock::new(None)), None);
+        let perfs = harness.debug_run(Some(&words))?;
+
+        let full_guesses = vec![
+            Word::from_str("nerds")?,
+            Word::from_str("tithe")?,
+            Word::from_str("doubt")?,
+            Word::from_str("point")?,
+            Word::from_str("parka")?,
+            Word::from_str("sword")?,
+        ];
+
+        let partials = [
+            &full_guesses[0..2],
+            &full_guesses,
+            &full_guesses[0..5],
+            &full_guesses,
+            &full_guesses,
+            &full_guesses[0..3],
+            &full_guesses,
+            &full_guesses,
+        ];
+
+        for (expected, found) in words.iter().zip(partials).zip(&perfs.deref()[0].tries) {
+            assert_eq!(*expected.0, found.0);
+            assert_eq!(expected.1, found.1.inner())
+        }
+
+        assert_eq!(perfs[0].strategy_name(), "Mock None v1.2.4");
+        assert_eq!(perfs[0].num_tried(), 8);
+        assert_eq!(perfs[0].num_solved(), 4);
+        assert!(perfs[0].frac_solved() - 0.5 < f32::EPSILON);
+        assert_eq!(perfs[0].cumulative_guesses(), 2 + 6 + 5 + 6 + 6 + 3 + 6 + 6);
+        assert_eq!(perfs[0].cumulative_guesses_solved(), 2 + 5 + 3 + 6);
+        assert!(perfs[0].mean_guesses().unwrap() - 4. < f32::EPSILON);
+        assert_eq!(perfs[0].num_missed(), 4);
+        assert!(perfs[0].frac_missed() - 0.5 < f32::EPSILON);
+
+        let summary = perfs[0].to_summary();
+
+        assert_eq!(summary.strategy_name(), "Mock None v1.2.4");
+        assert_eq!(summary.histogram, [0, 1, 1, 0, 1, 1].into());
+        assert_eq!(summary.num_tried(), 8);
+        assert_eq!(summary.num_solved(), 4);
+        assert!(summary.frac_solved() - 0.5 < f32::EPSILON);
+        assert_eq!(summary.cumulative_guesses(), 2 + 6 + 5 + 6 + 6 + 3 + 6 + 6);
+        assert_eq!(summary.cumulative_guesses_solved(), 2 + 5 + 3 + 6);
+        assert!(summary.mean_guesses().unwrap() - 4. < f32::EPSILON);
+        assert_eq!(summary.num_missed(), 4);
+        assert!(summary.frac_missed() - 0.5 < f32::EPSILON);
+
+        Ok(())
+    }
+
+    proptest! {
+        #[test]
+        fn perf_matches_summary(guesses in &proptest::sample::subsequence(&crate::words::GUESSES.as_ref()[0..50], 1..7), answers in &proptest::sample::subsequence(&crate::words::GUESSES.as_ref()[0..50], 1..20)) {
+            let answers: Vec<Word> = answers.iter().map(|s| Word::from_str(s).unwrap()).collect();
+
+            let harness = Harness::new()
+                .parallel(false)
+                .add_strategy(Box::new(Mock::new(Some(guesses))), None);
+
+            let perfs = harness.debug_run(Some(&answers))?;
+
+            let summary = perfs[0].to_summary();
+
+            assert_eq!(perfs[0].strategy_name(), summary.strategy_name());
+            assert_eq!(perfs[0].num_tried(), summary.num_tried());
+            assert_eq!(perfs[0].num_solved(), summary.num_solved());
+            assert!(perfs[0].frac_solved() - summary.frac_solved() < f32::EPSILON);
+            assert_eq!(perfs[0].cumulative_guesses(), summary.cumulative_guesses());
+            assert_eq!(perfs[0].cumulative_guesses_solved(), summary.cumulative_guesses_solved());
+            assert_eq!(perfs[0].mean_guesses().is_some(), summary.mean_guesses().is_some());
+            if summary.mean_guesses().is_some() {
+                assert!(perfs[0].mean_guesses().unwrap() - summary.mean_guesses().unwrap() < f32::EPSILON);
+            }
+            assert_eq!(perfs[0].num_missed(), summary.num_missed());
+            assert!(perfs[0].frac_missed() - summary.frac_missed() < f32::EPSILON);
+
+            assert!(summary.frac_missed() + summary.frac_solved() - 1. < f32::EPSILON);
+            assert_eq!(summary.num_missed() + summary.num_solved(), summary.num_tried());
+        }
+
+        #[test]
+        fn compare_equal_tries(mut guesses in &proptest::sample::subsequence(&crate::words::GUESSES.as_ref()[0..50], 2..13), answers in &proptest::sample::subsequence(&crate::words::GUESSES.as_ref()[0..50], 10..20)) {
+            let answers: Vec<Word> = answers.iter().map(|s| Word::from_str(s).unwrap()).collect();
+
+            let pivot = guesses.len() / 2;
+            assert!(1 <= pivot && pivot <= 6);
+            let (guesses1, guesses2) = guesses.split_at(pivot);
+
+            let harness = Harness::new()
+                .parallel(false)
+                .add_strategy(Box::new(Mock::new(Some(guesses1.to_vec()))), None)
+                .add_strategy(Box::new(Mock::new(Some(guesses2.to_vec()))), None);
+
+            let perfs = harness.debug_run(Some(&answers))?;
+
+            let summary1 = perfs[0].to_summary();
+            let summary2 = perfs[1].to_summary();
+            match summary1.compare(&summary2) {
+                Ok(comparison) => {
+                    assert!(comparison.tried_eq());
+                    assert_eq!(comparison.num_tried().unwrap(), summary1.num_tried());
+                    assert_eq!(comparison.num_solved_diff().unwrap() + summary2.num_solved() as i32, summary1.num_solved() as i32);
+                    assert_eq!(comparison.num_missed_diff().unwrap() + summary2.num_missed() as i32, summary1.num_missed() as i32);
+                    assert!(comparison.frac_solved_diff() + summary2.frac_solved() - summary1.frac_solved() < f32::EPSILON);
+                    assert!(comparison.frac_missed_diff() + summary2.frac_missed() - summary1.frac_missed() < f32::EPSILON);
+                    if let Some(mean) = comparison.mean_guesses_diff() {
+                        assert!(mean + summary2.mean_guesses().unwrap() - summary1.mean_guesses().unwrap() < f32::EPSILON);
+                    }
+                }
+                Err(WordleError::Stats) => {},
+                Err(e) => Err(e)?,
+            }
+        }
     }
 }

@@ -1,3 +1,4 @@
 /target
 wordle_baseline/
 flamegraph.svg
+test_coverage/
