@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use wordle_rs::{
     strategy::{Attempts, AttemptsKey, Puzzle, Strategy, Word},
     words::GUESSES,
+    wrappable,
 };
 
 use crate::util::Information;
@@ -36,6 +37,7 @@ use crate::util::Information;
 /// # Ok::<_, wordle_rs::WordleError>(())
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize)]
+#[wrappable(new = new, name = basic)]
 pub struct Basic {
     first_word: Option<Word>,
 }
@@ -49,7 +51,7 @@ impl Basic {
     }
 
     /// Makes the strategy guess a specific first word.
-    pub fn first_word(self, word: Word) -> Self {
+    pub const fn first_word(self, word: Word) -> Self {
         Basic {
             first_word: Some(word),
         }
@@ -57,7 +59,7 @@ impl Basic {
 
     /// Makes the strategy use its default first word, "aahed" (the first
     /// word in the wordlist.)
-    pub fn no_first_word(self) -> Self {
+    pub const fn no_first_word(self) -> Self {
         Basic { first_word: None }
     }
 }

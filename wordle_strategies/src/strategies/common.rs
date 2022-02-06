@@ -3,7 +3,10 @@ use std::fmt::Display;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 
-use wordle_rs::strategy::{Attempts, AttemptsKey, Strategy, Word};
+use wordle_rs::{
+    strategy::{Attempts, AttemptsKey, Strategy, Word},
+    wrappable,
+};
 
 use crate::util::{occurrences, Information};
 
@@ -22,7 +25,15 @@ use crate::util::{occurrences, Information};
 /// let strategy = Common;
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[wrappable(new = new, name = common)]
 pub struct Common;
+
+impl Common {
+    /// Creates a new instance.
+    pub const fn new() -> Self {
+        Common
+    }
+}
 
 impl Strategy for Common {
     fn solve(&self, puzzle: &mut wordle_rs::strategy::Puzzle, key: AttemptsKey) -> Attempts {

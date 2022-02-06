@@ -299,11 +299,14 @@ impl Puzzle {
         Ok(())
     }
 
+    /// Creates a new puzzle in a ~secret~ way for wasm.
+    #[doc(hidden)]
     #[cfg(target_family = "wasm")]
     pub fn __secret_new(word: Word, poisoned: bool) -> Self {
         Self { word, poisoned }
     }
 
+    /// Detects if the puzzle is poisoned in a ~secret~ way for wasm.
     #[cfg(target_family = "wasm")]
     pub fn __secret_is_poisoned(&self) -> bool {
         self.poisoned
@@ -361,16 +364,8 @@ impl AttemptsKey {
         Attempts::new(self.hard, self.cheat)
     }
 
-    pub(crate) fn from_i32(other: i32) -> Self {
-        let other = other as u16;
-        unsafe { std::mem::transmute::<u16, AttemptsKey>(other) }
-    }
-
-    pub(crate) fn to_i32(self) -> i32 {
-        let almost: u16 = unsafe { std::mem::transmute::<AttemptsKey, u16>(self) };
-        almost as i32
-    }
-
+    /// Creates a key in a ~secret~ way for wasm.
+    #[doc(hidden)]
     #[cfg(target_family = "wasm")]
     pub fn __secret_new(hard: bool, cheat: bool) -> Self {
         Self { hard, cheat }

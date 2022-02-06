@@ -1892,6 +1892,16 @@ dependencies = [
  "statrs",
  "thiserror",
  "wasmer",
+ "wordle_rs_macro",
+]
+
+[[package]]
+name = "wordle_rs_macro"
+version = "0.2.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

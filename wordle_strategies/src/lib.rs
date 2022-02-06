@@ -6,6 +6,3 @@ mod strategies;
 pub mod util;
 
 pub use strategies::*;
-
-#[cfg(target_family = "wasm")]
-pub mod wasm;

@@ -21,9 +21,10 @@ use crate::{
     HarnessError, Result, Summary, WordleError,
 };
 
-#[cfg(not(target_family = "wasm"))]
+#[cfg(feature = "wasm_consumer")]
 mod wasm;
-#[cfg(not(target_family = "wasm"))]
+#[doc(inline)]
+#[cfg(feature = "wasm_consumer")]
 pub use wasm::WasmWrapper;
 
 /// A test harness that can run many strategies on many puzzles.

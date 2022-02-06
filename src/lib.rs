@@ -19,6 +19,9 @@ pub mod words;
 #[cfg(not(target_family = "wasm"))]
 pub mod harness;
 #[doc(inline)]
+#[cfg(all(feature = "wasm_consumer", not(target_family = "wasm")))]
+pub use harness::WasmWrapper;
+#[doc(inline)]
 #[cfg(not(target_family = "wasm"))]
 pub use harness::{Harness, Record};
 
@@ -33,6 +36,13 @@ mod stats;
 
 #[cfg(test)]
 mod mock;
+
+#[cfg(target_family = "wasm")]
+mod wasm_rt;
+
+#[doc(inline)]
+#[cfg(feature = "macro")]
+pub use wordle_rs_macro::wrappable;
 
 /// A convenient redefinition of [`std::result::Result`] that uses [`WordleError`]
 /// as the error type.
@@ -152,6 +162,8 @@ pub enum HarnessError {
     #[error("the strategy {0} cheated")]
     StrategyCheated(String),
 
+    /// There were problems loading a wasm strategy.
+    #[cfg(not(target_family = "wasm"))]
     #[error("could not load, compile, or instantiate wasm module:\n{0}")]
     Wasm(#[source] Box<dyn StdError + Send>),
 }

@@ -47,15 +47,28 @@ fn get_wasm_bytes_and_free(
     Ok(bytes)
 }
 
+/// A special strategy that actually wraps a wasm module compiled with
+/// `wordle_rs` that defines a strategy.
+///
+/// This strategy simply forwards calls to the wrapped strategy.
 #[derive(Debug, Clone)]
 pub struct WasmWrapper {
     instance: Instance,
+    short_name: String,
     hard: bool,
     version: String,
 }
 
 impl WasmWrapper {
-    pub fn new(wasm_path: impl AsRef<Path>) -> Result<Self, WordleError> {
+    /// Wraps an already-compiled wasm module.
+    ///
+    /// The `wasm_path` parameter should point to a wasm binary
+    /// compiled with the target `wasm32-unknown-unknown`, the `cdylib`
+    /// crate type, and linked against `wordle_rs`.
+    pub fn new_from_wasm(
+        wasm_path: impl AsRef<Path>,
+        short_name: &str,
+    ) -> Result<Self, WordleError> {
         let mut binary = Vec::new();
         let mut wasm_file = File::options()
             .write(false)
@@ -73,10 +86,10 @@ impl WasmWrapper {
         let instance =
             Instance::new(&module, &imports).map_err(|e| HarnessError::Wasm(Box::new(e)))?;
 
-        Self::validate(instance)
+        Self::validate(instance, short_name)
     }
 
-    fn validate(instance: Instance) -> Result<Self, WordleError> {
+    fn validate(instance: Instance, short_name: &str) -> Result<Self, WordleError> {
         // Make sure that the instance has the proper exports, etc.
         let canonical_abi_free: NativeFunc<(i32, i32, i32), ()> = instance
             .exports
@@ -84,11 +97,11 @@ impl WasmWrapper {
             .map_err(|e| HarnessError::Wasm(Box::new(e)))?;
         let init_trampoline: NativeFunc<(), i32> = instance
             .exports
-            .get_native_function("init_trampoline")
+            .get_native_function(&format!("init_trampoline_{}", short_name))
             .map_err(|e| HarnessError::Wasm(Box::new(e)))?;
         let _solve_trampoline: NativeFunc<(i32, i32, i32, i32), i32> = instance
             .exports
-            .get_native_function("solve_trampoline")
+            .get_native_function(&format!("solve_trampoline_{}", short_name))
             .map_err(|e| HarnessError::Wasm(Box::new(e)))?;
         let memory = instance
             .exports
@@ -110,6 +123,7 @@ impl WasmWrapper {
 
         Ok(Self {
             instance,
+            short_name: short_name.to_string(),
             hard,
             version,
         })
