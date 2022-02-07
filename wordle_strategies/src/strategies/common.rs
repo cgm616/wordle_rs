@@ -62,8 +62,8 @@ impl Strategy for Common {
                     .find(|s| {
                         let mut works = true;
 
-                        for (d, _) in info.almost.iter() {
-                            if !s.contains(*d) {
+                        for (d, (_, count)) in info.almost.iter() {
+                            if s.chars().filter(|c| d == c).count() < *count as usize {
                                 works = false;
                                 break;
                             }
@@ -75,7 +75,9 @@ impl Strategy for Common {
             )
             .unwrap();
 
-            let (grades, got_it) = puzzle.check(&guess, &mut attempts).unwrap();
+            let (grades, got_it) = puzzle.check(&guess, &mut attempts).unwrap_or_else(|e| panic!(
+                "got error while guessing: {e}\nInformation: {info:?}\nattempts:\n{attempts}\n{guess} <-- bad guess here\n",
+            ));
             if got_it {
                 break;
             }
@@ -97,5 +99,25 @@ impl Strategy for Common {
 impl Display for Common {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "wordle_strategies::Common")
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use wordle_rs::{AttemptsKey, Puzzle, Result, Strategy, Word};
+
+    #[test]
+    fn ayaya_panic() -> Result<()> {
+        let word = Word::from_str("ayaya")?;
+
+        let mut puzzle = Puzzle::new(word);
+        let key = AttemptsKey::new_cheat(true);
+
+        let strat = Common::new();
+
+        let _ = strat.solve(&mut puzzle, key);
+
+        Ok(())
     }
 }
