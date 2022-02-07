@@ -1,4 +1,10 @@
+extern crate wee_alloc;
+
 use std::alloc::{self, Layout};
+
+// Use `wee_alloc` as the global allocator.
+#[global_allocator]
+static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 // Taken from https://github.com/bytecodealliance/wit-bindgen/blob/d505f87e67c42006631f913152ab16f96153cef4/crates/rust-wasm/src/futures.rs
 #[no_mangle]

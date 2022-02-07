@@ -9,6 +9,9 @@ use crate::{
     HarnessError, Strategy, WordleError,
 };
 
+const FREE_FUNC: &'static str = "canonical_abi_free";
+const REALLOC_FUNC: &'static str = "canonical_abi_realloc";
+
 fn bool_to_i32(b: bool) -> i32 {
     match b {
         false => 0i32,
@@ -55,6 +58,8 @@ fn get_wasm_bytes_and_free(
 pub struct WasmWrapper {
     instance: Instance,
     short_name: String,
+    solve_func: String,
+    init_func: String,
     hard: bool,
     version: String,
 }
@@ -90,18 +95,21 @@ impl WasmWrapper {
     }
 
     fn validate(instance: Instance, short_name: &str) -> Result<Self, WordleError> {
+        let solve_func = format!("__solve_trampoline_{}", short_name);
+        let init_func = format!("__init_trampoline_{}", short_name);
+
         // Make sure that the instance has the proper exports, etc.
         let canonical_abi_free: NativeFunc<(i32, i32, i32), ()> = instance
             .exports
-            .get_native_function("canonical_abi_free")
+            .get_native_function(FREE_FUNC)
             .map_err(|e| HarnessError::Wasm(Box::new(e)))?;
         let init_trampoline: NativeFunc<(), i32> = instance
             .exports
-            .get_native_function(&format!("init_trampoline_{}", short_name))
+            .get_native_function(&init_func)
             .map_err(|e| HarnessError::Wasm(Box::new(e)))?;
         let _solve_trampoline: NativeFunc<(i32, i32, i32, i32), i32> = instance
             .exports
-            .get_native_function(&format!("solve_trampoline_{}", short_name))
+            .get_native_function(&solve_func)
             .map_err(|e| HarnessError::Wasm(Box::new(e)))?;
         let memory = instance
             .exports
@@ -124,6 +132,8 @@ impl WasmWrapper {
         Ok(Self {
             instance,
             short_name: short_name.to_string(),
+            solve_func,
+            init_func,
             hard,
             version,
         })
@@ -137,12 +147,12 @@ impl Strategy for WasmWrapper {
         let canonical_abi_free: NativeFunc<(i32, i32, i32), ()> = self
             .instance
             .exports
-            .get_native_function("canonical_abi_free")
+            .get_native_function(FREE_FUNC)
             .unwrap();
         let solve_trampoline: NativeFunc<(i32, i32, i32, i32), i32> = self
             .instance
             .exports
-            .get_native_function("solve_trampoline")
+            .get_native_function(&self.solve_func)
             .unwrap();
         let memory = self.instance.exports.get_memory("memory").unwrap();
 
@@ -164,7 +174,7 @@ impl Strategy for WasmWrapper {
         let index = (baseline / 4) as usize;
 
         let view = memory.view::<i32>();
-        let poisoned = i32_to_bool(view[index + 0].get());
+        let poisoned = i32_to_bool(view[index].get());
         let bytes = get_wasm_bytes_and_free(memory, canonical_abi_free, baseline + 8).unwrap();
 
         puzzle.poisoned = puzzle.poisoned || poisoned;
