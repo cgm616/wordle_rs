@@ -166,4 +166,9 @@ pub enum HarnessError {
     #[cfg(not(target_family = "wasm"))]
     #[error("could not load, compile, or instantiate wasm module:\n{0}")]
     Wasm(#[source] Box<dyn StdError + Send>),
+
+    /// Cargo returned an error when trying to compile a strategy.
+    #[cfg(not(target_family = "wasm"))]
+    #[error("could not compile strategy with cargo")]
+    Cargo,
 }

@@ -1,12 +1,20 @@
 //! A Strategy that wraps a wasm module.
 
-use std::{fmt::Display, fs::File, io::Read, path::Path};
+use std::{
+    fmt::Display,
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
+use log::{debug, error, info, trace, warn};
+use serde_json::Value;
 use wasmer::{imports, Instance, Memory, Module, NativeFunc, Store};
 
 use crate::{
     strategy::{Attempts, AttemptsKey, Puzzle, Word},
-    HarnessError, Strategy, WordleError,
+    HarnessError, Result, Strategy, WordleError,
 };
 
 const FREE_FUNC: &'static str = "canonical_abi_free";
@@ -29,7 +37,7 @@ fn get_wasm_bytes_and_free(
     memory: &Memory,
     free: NativeFunc<(i32, i32, i32), ()>,
     baseline: i32,
-) -> Result<Vec<u8>, WordleError> {
+) -> Result<Vec<u8>> {
     assert_eq!(baseline % 4, 0);
     assert_eq!(std::mem::size_of::<i32>(), 4);
     let index = (baseline / 4) as usize;
@@ -65,15 +73,112 @@ pub struct WasmWrapper {
 }
 
 impl WasmWrapper {
+    /// Compiles a wasm module from a Rust library crate that defines a
+    /// strategy using the `wrappable` macro.
+    ///
+    /// This function simply runs `cargo` on the library targeting
+    /// `wasm32-unknown-unknown`, grabs the resulting wasm binary, and
+    /// passes it to [`new_from_wasm()`][Self::new_from_wasm()].
+    pub fn new_from_crate(crate_path: impl AsRef<Path>, short_name: &str) -> Result<Self> {
+        debug!(
+            "compiling crate at {:?} to wasm module",
+            crate_path.as_ref()
+        );
+
+        let mut canonical =
+            std::fs::canonicalize(&crate_path).map_err(|e| HarnessError::Wasm(Box::new(e)))?;
+
+        info!("running `cargo rustc` in directory {:?}", &canonical);
+
+        let rustc = Command::new("cargo")
+            .current_dir(&canonical)
+            .env("CARGO_BUILD_PIPELINING", "false")
+            .args([
+                "rustc",
+                "--release",
+                "--target=wasm32-unknown-unknown",
+                "--",
+                "--crate-type=cdylib",
+                "--print=file-names",
+            ])
+            .output()
+            .map_err(|e| HarnessError::Wasm(Box::new(e)))?;
+
+        if !rustc.status.success() {
+            error!("`cargo rustc` returned an error exit code!");
+            match String::from_utf8(rustc.stderr) {
+                Ok(s) => eprintln!("{}", s),
+                Err(e) => {
+                    warn!(
+                        "could not print corrupted `cargo rustc` error output: {}",
+                        e
+                    );
+                }
+            }
+            return Err(HarnessError::Cargo.into());
+        }
+
+        let rustc_names = String::from_utf8(rustc.stdout).map_err(|e| {
+            error!("`cargo rustc` file names not valid utf8: {}", e);
+            HarnessError::Cargo
+        })?;
+
+        let artifact = rustc_names
+            .lines()
+            .filter(|s| s.ends_with(".wasm"))
+            .next()
+            .ok_or_else(|| {
+                error!("`cargo rustc` did not produce wasm artifact");
+                HarnessError::Cargo
+            })?;
+
+        debug!("`cargo rustc` succeeded with artifact name: {}", artifact);
+
+        debug!("running `cargo metadata`...");
+
+        let metadata = Command::new("cargo")
+            .current_dir(&canonical)
+            .args(["metadata", "--format-version=1"])
+            .output()
+            .map_err(|e| HarnessError::Wasm(Box::new(e)))?;
+
+        if !metadata.status.success() {
+            error!("`cargo metadata` returned an error exit code!");
+            return Err(HarnessError::Cargo.into());
+        }
+
+        let metadata =
+            String::from_utf8(metadata.stdout).map_err(|e| HarnessError::Wasm(Box::new(e)))?;
+        let json: Value =
+            serde_json::from_str(&metadata).map_err(|e| HarnessError::Wasm(Box::new(e)))?;
+        let target_dir = json["target_directory"]
+            .as_str()
+            .ok_or(HarnessError::Cargo)?;
+
+        debug!("found target directory: {}", target_dir);
+
+        let mut wasm_path = PathBuf::new();
+        wasm_path.push(target_dir);
+        wasm_path.push("wasm32-unknown-unknown/release/deps");
+        wasm_path.push(artifact);
+        wasm_path.set_extension("wasm");
+
+        if !wasm_path.is_file() {
+            error!("output wasm file does not exist! checked {:?}", &wasm_path);
+            return Err(HarnessError::Cargo.into());
+        }
+
+        info!("building wasm module from source succeeded!");
+
+        Self::new_from_wasm(wasm_path, short_name)
+    }
+
     /// Wraps an already-compiled wasm module.
     ///
     /// The `wasm_path` parameter should point to a wasm binary
     /// compiled with the target `wasm32-unknown-unknown`, the `cdylib`
     /// crate type, and linked against `wordle_rs`.
-    pub fn new_from_wasm(
-        wasm_path: impl AsRef<Path>,
-        short_name: &str,
-    ) -> Result<Self, WordleError> {
+    pub fn new_from_wasm(wasm_path: impl AsRef<Path>, short_name: &str) -> Result<Self> {
         let mut binary = Vec::new();
         let mut wasm_file = File::options()
             .write(false)
@@ -94,7 +199,7 @@ impl WasmWrapper {
         Self::validate(instance, short_name)
     }
 
-    fn validate(instance: Instance, short_name: &str) -> Result<Self, WordleError> {
+    fn validate(instance: Instance, short_name: &str) -> Result<Self> {
         let solve_func = format!("__solve_trampoline_{}", short_name);
         let init_func = format!("__init_trampoline_{}", short_name);
 

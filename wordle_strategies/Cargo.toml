@@ -11,8 +11,6 @@ keywords = ["wordle", "word", "game", "testing", "strategy"]
 categories = ["simulation"]
 readme = "README.md"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 itertools = "0.10"
