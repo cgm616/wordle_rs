@@ -1,0 +1,5 @@
+pre-release-replacements = [
+]
+tag = false
+tag-prefix = ""
+shared-version = true

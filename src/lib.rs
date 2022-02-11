@@ -16,19 +16,33 @@ pub use strategy::{Attempts, AttemptsKey, Grade, Puzzle, Strategy, Word};
 
 pub mod words;
 
+#[cfg(not(target_family = "wasm"))]
 pub mod harness;
 #[doc(inline)]
+#[cfg(all(feature = "wasm_consumer", not(target_family = "wasm")))]
+pub use harness::WasmWrapper;
+#[doc(inline)]
+#[cfg(not(target_family = "wasm"))]
 pub use harness::{Harness, Record};
 
+#[cfg(not(target_family = "wasm"))]
 pub mod perf;
 #[doc(inline)]
+#[cfg(not(target_family = "wasm"))]
 pub use perf::{Comparison, Perf, PrintOptions, Summary};
 
-#[cfg(feature = "stats")]
+#[cfg(all(feature = "stats", not(target_family = "wasm")))]
 mod stats;
 
 #[cfg(test)]
 mod mock;
+
+#[cfg(target_family = "wasm")]
+mod wasm_rt;
+
+#[doc(inline)]
+#[cfg(feature = "macro")]
+pub use wordle_rs_macro::wrappable;
 
 /// A convenient redefinition of [`std::result::Result`] that uses [`WordleError`]
 /// as the error type.
@@ -46,18 +60,22 @@ pub enum WordleError {
         kind: PuzzleError,
     },
 
+    #[cfg(not(target_family = "wasm"))]
     /// Could not print.
     #[error("IO error while printing")]
     Printing(#[from] std::io::Error),
 
+    #[cfg(not(target_family = "wasm"))]
     /// Attempted to compare a strategy with itself.
     #[error("cannot compare a strategy with itself")]
     SelfComparison,
 
+    #[cfg(not(target_family = "wasm"))]
     /// Attempted to run stats on bad performance data.
     #[error("can not run stats on this data")]
     Stats,
 
+    #[cfg(not(target_family = "wasm"))]
     /// An error belonging to the part of this crate used to run strategies
     /// (i.e. the test harness).
     #[error(transparent)]
@@ -114,6 +132,7 @@ pub enum PuzzleError {
 /// let error = HarnessError::BaselineAlreadySet;
 /// let wrapped: WordleError = error.into();
 /// ```
+#[cfg(not(target_family = "wasm"))]
 #[derive(Debug, Error)]
 pub enum HarnessError {
     /// The test harness already has a baseline.
@@ -142,4 +161,14 @@ pub enum HarnessError {
     /// to gain more information about its puzzle.
     #[error("the strategy {0} cheated")]
     StrategyCheated(String),
+
+    /// There were problems loading a wasm strategy.
+    #[cfg(not(target_family = "wasm"))]
+    #[error("could not load, compile, or instantiate wasm module:\n{0}")]
+    Wasm(#[source] Box<dyn StdError + Send>),
+
+    /// Cargo returned an error when trying to compile a strategy.
+    #[cfg(not(target_family = "wasm"))]
+    #[error("could not compile strategy with cargo")]
+    Cargo,
 }

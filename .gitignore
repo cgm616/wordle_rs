@@ -1,4 +1,5 @@
 /target
+wasm_playground/
 wordle_baseline/
 flamegraph.svg
 test_coverage/

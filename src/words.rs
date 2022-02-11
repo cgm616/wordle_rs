@@ -175,7 +175,7 @@ pub const ANSWERS: [usize; 2315] = [
 /// In the Wordle source code, this list is disjoint from the list of possible answers. I
 /// have duplicated the elements of that list here to make guessing easier.
 /// The elements of the answer list are mixed in and this array is sorted.
-pub const GUESSES: [&str; 12972] = [
+pub const GUESSES: [&'static str; 12972] = [
     "aahed", "aalii", "aargh", "aarti", "abaca", "abaci", "aback", "abacs", "abaft", "abaka",
     "abamp", "aband", "abase", "abash", "abask", "abate", "abaya", "abbas", "abbed", "abbes",
     "abbey", "abbot", "abcee", "abeam", "abear", "abele", "abers", "abets", "abhor", "abide",
