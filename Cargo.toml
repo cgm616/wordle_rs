@@ -41,7 +41,7 @@ thiserror = "1.0.30"
 
 [dev-dependencies]
 proptest = "1.0.0"
-pyo3 = { version = "0.15.1", features = ["auto-initialize"] }
+pyo3 = { version = "0.24.1", features = ["auto-initialize"] }
 
 [package.metadata.cargo-all-features]
 skip_optional_dependencies = true
